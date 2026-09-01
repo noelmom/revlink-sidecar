@@ -1996,6 +1996,33 @@ static bool portal_selected_device_identity(
     return found;
 }
 
+/*
+ * The AccessPort refuses a destination it already holds, and it refuses it at
+ * the readiness step — after a transfer has been started and the write service
+ * has entered its running state. The owner then sees a generic failure for
+ * something that was never going to work.
+ *
+ * The cached inventory mirrors the device after a sync, so it is a good
+ * pre-flight. It is not the authority: if it cannot be read, say nothing and
+ * let the device decide, exactly as before.
+ */
+static bool portal_destination_already_present(const char *destination)
+{
+    revlink_sd_portal_snapshot_t *snapshot = calloc(1U, sizeof(*snapshot));
+    if (snapshot == NULL) return false;
+    bool present = false;
+    if (revlink_sd_portal_snapshot(snapshot) == ESP_OK) {
+        for (size_t index = 0U; index < snapshot->listed_files; ++index) {
+            if (strcmp(snapshot->files[index].path, destination) == 0) {
+                present = true;
+                break;
+            }
+        }
+    }
+    free(snapshot);
+    return present;
+}
+
 static esp_err_t portal_map_stage_handler(httpd_req_t *request)
 {
     if (!portal_header_is_valid(request)) {
@@ -2041,6 +2068,16 @@ static esp_err_t portal_map_stage_handler(httpd_req_t *request)
             "{\"error\":\"Use a .ptm file name without a folder\"}"
         );
     }
+    if (portal_destination_already_present(destination)) {
+        return send_json(
+            request,
+            "409 Conflict",
+            "{\"error\":\"This AccessPort already has a map with that name. "
+            "Existing maps are never overwritten \u2014 rename the file and "
+            "save it again.\"}"
+        );
+    }
+
     esp_err_t status = revlink_map_upload_stage_begin(
         name,
         destination,

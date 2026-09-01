@@ -39,8 +39,8 @@
     {
       "path": "revlink-sidecar.bin",
       "offset": 131072,
-      "size": 1382560,
-      "sha256": "03fae4f80d2325410ab69354a611ce3014ae23e18f4dc064109c869054c2e940"
+      "size": 1383104,
+      "sha256": "1bcd729d608a77171ed51694840cbfcac82384dc55f7bca599a6fcd1dad26bee"
     }
   ]
 }

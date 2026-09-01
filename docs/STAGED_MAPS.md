@@ -68,6 +68,24 @@ An unpinned payload — staged when no dataset was selected — still works for 
 manual apply with the device in front of you. It simply does not persist
 across a restart and is never applied automatically.
 
+## Names that already exist
+
+An AccessPort never overwrites a map, and it refuses a destination it already
+holds at the readiness step — after a transfer has started. Left alone that
+surfaces as a generic failure for something that could never have worked.
+
+Staging therefore checks the cached inventory first and refuses the name up
+front:
+
+```
+409  This AccessPort already has a map with that name. Existing maps are
+     never overwritten — rename the file and save it again.
+```
+
+The cache mirrors the device after a sync, so this is a pre-flight, not the
+authority. If it cannot be read, staging proceeds and the device decides, as
+it did before.
+
 ## After a transfer
 
 A verified write clears the staged payload. The map reached the device and

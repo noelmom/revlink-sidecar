@@ -918,7 +918,9 @@
       finally{setBackupBusy(false)}
     }
     function mapTransferFailure(error){
-      if(error===0x103)return'The selected AccessPort changed or was unavailable before the transfer safely started.';
+      // 0x103 also arrives when the AccessPort refuses the destination at the
+      // readiness step, which in practice means it already holds that name.
+      if(error===0x103)return'The transfer did not start. The AccessPort may already have a map with that name \u2014 existing maps are never overwritten \u2014 or it changed or became unavailable beforehand.';
       if(error===0x107)return'The transfer timed out. Reconnect the AccessPort before trying again; the map was not retried automatically.';
       if(error===0x108)return'The AccessPort did not accept the expected transfer response. Reconnect it before trying again.';
       if(error===0x109)return'The transferred map could not be verified byte-for-byte. Reconnect the AccessPort before another write.';
