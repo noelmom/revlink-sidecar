@@ -279,3 +279,10 @@ footer {
   background: var(--panel);
   color: var(--ink);
 }
+
+.speed .hint {
+  font-size: .8rem;
+  opacity: .8;
+}
+
+.speed input[type="checkbox"] { margin: 0; }

@@ -26,6 +26,7 @@ const ui = {
   log: el("log"),
   release: el("release"),
   baud: el("baud"),
+  erase: el("erase"),
 };
 
 let manifest = null;
@@ -225,11 +226,12 @@ function describe(error) {
         message
       )) {
     return (
-      "The write stopped partway. This is almost always the serial link " +
-      "running faster than the board's USB bridge can keep up with, not a " +
-      "problem with the board. Pick a lower transfer speed and press Flash " +
-      "again — you do not need to reconnect, and a half-written board is not " +
-      "a broken one."
+      "The write stopped partway. The board is fine — this is the loader " +
+      "not getting an answer in time, usually because it is erasing as it " +
+      "writes. Tick \u201cErase the whole flash first\u201d and press Flash " +
+      "again; if it still stops at the same point, drop the transfer speed " +
+      "too. You do not need to reconnect, and a half-written board is not a " +
+      "broken one."
     );
   }
   if (/Timed out waiting for packet header|Failed to connect/i.test(message)) {
@@ -266,7 +268,14 @@ async function flash() {
       flashSize: manifest.flash.size,
       flashMode: manifest.flash.mode,
       flashFreq: manifest.flash.frequency,
-      eraseAll: false,
+      /*
+       * Erasing up front is the difference between a write that finishes and
+       * one that stalls. Left to itself the loader erases as it writes, and a
+       * block erase that runs long makes the device miss its response window
+       * — which surfaces as a short reply and a failed block, always at the
+       * same place regardless of transfer speed.
+       */
+      eraseAll: ui.erase?.checked !== false,
       compress: true,
       reportProgress: (index, written, fileTotal) => {
         fraction[index] = fileTotal > 0 ? Math.min(1, written / fileTotal) : 0;

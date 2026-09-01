@@ -86,6 +86,12 @@
       <button id="disconnect" type="button" disabled>Disconnect</button>
     </div>
     <label class="speed">
+      <input type="checkbox" id="erase" checked>
+      Erase the whole flash first
+      <span class="hint">slower, but avoids a stall partway; also clears saved
+        Wi-Fi and settings</span>
+    </label>
+    <label class="speed">
       Transfer speed
       <select id="baud">
         <option value="115200" selected>115200 — most reliable</option>
