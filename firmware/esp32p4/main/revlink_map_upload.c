@@ -461,6 +461,19 @@ static void observe_upload(
     service.state = event->state;
     service.platform_error = event->platform_error;
     service.recovery_required = event->recovery_required;
+    if (event->state == REVLINK_ACCESSPORT_UPLOAD_VERIFIED) {
+        /*
+         * The payload reached the device and read back byte-for-byte, so it
+         * is no longer pending anything. Leaving it staged would have the
+         * portal promise a transfer that already happened, and would offer
+         * the same map again on the next attach — where the device would
+         * refuse it as an existing destination.
+         *
+         * A failed write deliberately keeps its payload: recovery is the
+         * owner's decision, and they need something to retry.
+         */
+        discard_staged_locked();
+    }
     give_lock();
     if (event->state == REVLINK_ACCESSPORT_UPLOAD_VERIFIED
         || event->state == REVLINK_ACCESSPORT_UPLOAD_FAILED) {
@@ -756,6 +769,30 @@ void revlink_map_upload_stage_abort(void)
     if (!take_lock()) return;
     reset_stage_writer_locked();
     give_lock();
+#endif
+}
+
+esp_err_t revlink_map_upload_discard(void)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (!service.started || !take_lock()) return ESP_ERR_INVALID_STATE;
+    if (service.staging
+        || service.state == REVLINK_ACCESSPORT_UPLOAD_RUNNING) {
+        give_lock();
+        return ESP_ERR_INVALID_STATE;
+    }
+    const bool had_payload = service.staged;
+    discard_staged_locked();
+    service.name[0] = '\0';
+    service.destination[0] = '\0';
+    service.expected_size = 0U;
+    service.state = REVLINK_ACCESSPORT_UPLOAD_IDLE;
+    service.platform_error = ESP_OK;
+    give_lock();
+    if (had_payload) ESP_LOGW(TAG, "Staged map discarded by the owner");
+    return ESP_OK;
+#else
+    return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
 

@@ -76,6 +76,13 @@ esp_err_t revlink_map_upload_stage_commit(void);
 
 void revlink_map_upload_stage_abort(void);
 
+/*
+ * Throw away the staged payload and its metadata. The owner's escape hatch:
+ * without it a staged map can only be replaced, never removed, and a map that
+ * has already been transferred stays on the card claiming to be pending.
+ */
+esp_err_t revlink_map_upload_discard(void);
+
 esp_err_t revlink_map_upload_request(
     const revlink_ap_device_info_t *identity
 );

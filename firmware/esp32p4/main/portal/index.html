@@ -229,6 +229,7 @@
               <label class="map-destination"><span>AccessPort folder</span><div><strong>maps/</strong><input id="mapUploadName" type="text" maxlength="120" placeholder="My tuner map.ptm" autocomplete="off" spellcheck="false"></div><small>The folder is fixed for safety. You may rename only the map file.</small></label>
               <div id="mapUploadStatus" class="upload-status">Choose one .ptm map to transfer.</div>
               <div id="stagedMapNotice" class="upload-status staged" hidden></div>
+              <div id="stagedMapActions" class="upload-buttons" hidden><button id="discardMap" class="btn secondary">Discard saved map</button></div>
               <div class="upload-buttons"><button id="stageMap" class="btn secondary" disabled>Save to Sidecar</button><button id="applyMap" class="btn" disabled>Transfer to AccessPort</button></div>
               <p class="upload-hint">Saving keeps the map on the Sidecar and remembers which AccessPort it is for. You do not need the AccessPort plugged in to do that.</p>
             </div>
@@ -934,8 +935,10 @@
       renderStagedMap(upload,attached);
     }
     function renderStagedMap(upload,attached){
-      const notice=$('stagedMapNotice');
-      if(!upload.staged){notice.hidden=true;return}
+      const notice=$('stagedMapNotice'),actions=$('stagedMapActions');
+      // A verified transfer is finished, whatever the staging flag says.
+      if(!upload.staged||upload.state==='verified'){notice.hidden=true;actions.hidden=true;return}
+      actions.hidden=false;$('discardMap').disabled=upload.state==='running';
       if(!upload.pinned){
         notice.hidden=false;notice.className='upload-status staged warn';
         notice.textContent=`${upload.name} is saved on this Sidecar but is not tied to an AccessPort, so it will never transfer on its own. Select the dataset for its device and save it again.`;
@@ -971,6 +974,15 @@
         toast(enabled?'Saved maps will transfer automatically':'Automatic transfer turned off')
       }catch(error){if(!connectionError(error))toast(error.message)}
       finally{await loadStatus()}
+    }
+    async function discardMap(){
+      const upload=state.status?.mapUpload||{};
+      if(!confirm(`Discard ${upload.name||'the saved map'} from this Sidecar? The file on the AccessPort, if it was already transferred, is not touched.`))return;
+      try{
+        await jsonRequest('/api/portal/maps/discard',{method:'POST',headers:portalHeader});
+        toast('Saved map discarded')
+      }catch(error){if(!connectionError(error))toast(error.message)}
+      finally{await loadStatus();updateMapTransferButton()}
     }
     async function applyMap(){
       const file=$('mapUploadFile').files[0],name=$('mapUploadName').value.trim(),part=state.status?.attachedAccessPort?.partNumber||'the attached AccessPort',button=$('applyMap');
@@ -1121,7 +1133,7 @@
     document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>showView(button.dataset.view));
     document.querySelectorAll('[data-sync-button]').forEach(button=>button.onclick=()=>action('/api/portal/sync'));document.querySelectorAll('[data-cancel-button]').forEach(button=>button.onclick=()=>action('/api/portal/sync/cancel'));document.querySelectorAll('[data-auto-sync]').forEach(input=>input.onchange=event=>setAutoSync(event.target.checked));$('autoSyncSettings').onchange=event=>setAutoSync(event.target.checked);
     $('logSearch').oninput=$('logSort').onchange=$('mapSearch').oninput=$('mapSort').onchange=renderCollections;document.querySelectorAll('[data-clear-selection]').forEach(button=>button.onclick=()=>{state.selected.clear();renderCollections()});$('downloadLogs').onclick=()=>downloadSelected('datalog');$('emailLogs').onclick=emailSelectedLogs;$('downloadMaps').onclick=()=>downloadSelected('map');
-    $('mapUploadFile').onchange=event=>{const file=event.target.files[0];if(file)$('mapUploadName').value=file.name;updateMapTransferButton()};$('mapUploadName').oninput=updateMapTransferButton;$('applyMap').onclick=applyMap;$('stageMap').onclick=stageMap;$('writeConsent').onchange=event=>setWriteConsent(event.target.checked);$('mapAutoApply').onchange=event=>setMapAutoApply(event.target.checked);
+    $('mapUploadFile').onchange=event=>{const file=event.target.files[0];if(file)$('mapUploadName').value=file.name;updateMapTransferButton()};$('mapUploadName').oninput=updateMapTransferButton;$('applyMap').onclick=applyMap;$('stageMap').onclick=stageMap;$('discardMap').onclick=discardMap;$('writeConsent').onchange=event=>setWriteConsent(event.target.checked);$('mapAutoApply').onchange=event=>setMapAutoApply(event.target.checked);
     $('downloadBackup').onclick=downloadBackup;$('chooseRestore').onclick=()=>$('backupRestoreFile').click();$('backupRestoreFile').onchange=event=>previewRestore(event.target.files[0]);$('applyRestore').onclick=applyRestore;
     $('addStartupProfile').onclick=openStartupEditor;$('closeStartupEditor').onclick=closeStartupEditor;$('cancelStartupEditor').onclick=closeStartupEditor;$('saveStartupProfile').onclick=saveStartupImageProfile;
     $('startupImageFile').onchange=event=>{const file=event.target.files[0];if(!file)return;if(state.startupImageUrl)URL.revokeObjectURL(state.startupImageUrl);const url=URL.createObjectURL(file),image=new Image();state.startupImageUrl=url;image.onload=()=>{state.startupImage=image;$('startupProfileName').value=filename(file.name).replace(/\.[^.]+$/,'').slice(0,80);$('saveStartupProfile').disabled=false;renderStartupCrop()};image.onerror=()=>{if(state.startupImageUrl===url){URL.revokeObjectURL(url);state.startupImageUrl=null}state.startupImage=null;$('saveStartupProfile').disabled=true;toast('This image could not be opened. Try a PNG or JPEG file.')};image.src=url};

@@ -68,6 +68,20 @@ An unpinned payload — staged when no dataset was selected — still works for 
 manual apply with the device in front of you. It simply does not persist
 across a restart and is never applied automatically.
 
+## After a transfer
+
+A verified write clears the staged payload. The map reached the device and
+read back byte-for-byte, so it is no longer pending anything: leaving it
+staged would have the portal promise a transfer that already happened, and
+would offer the same map again on the next attach — where the device refuses
+it as an existing destination.
+
+A **failed** write deliberately keeps its payload. Recovery is the owner's
+decision, and they need something to retry.
+
+`POST /api/portal/maps/discard` throws a staged payload away. Without it a
+staged map could only be replaced, never removed.
+
 ## Failure behavior
 
 - A failed automatic write is **not retried**. The attempt is latched per

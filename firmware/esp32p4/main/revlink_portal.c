@@ -2181,6 +2181,26 @@ static esp_err_t portal_map_auto_apply_handler(httpd_req_t *request)
           );
 }
 
+static esp_err_t portal_map_discard_handler(httpd_req_t *request)
+{
+    if (!portal_header_is_valid(request)) {
+        return send_json(
+            request,
+            "403 Forbidden",
+            "{\"error\":\"Portal request header is missing\"}"
+        );
+    }
+    const esp_err_t status = revlink_map_upload_discard();
+    return status == ESP_OK
+        ? send_json(request, HTTPD_200, "{\"ok\":true}")
+        : send_json(
+              request,
+              status == ESP_ERR_NOT_SUPPORTED
+                  ? "501 Not Implemented" : "409 Conflict",
+              "{\"error\":\"A transfer is in progress\"}"
+          );
+}
+
 static esp_err_t portal_map_apply_handler(httpd_req_t *request)
 {
     if (!portal_header_is_valid(request)) {
@@ -2743,6 +2763,11 @@ esp_err_t revlink_portal_register(httpd_handle_t server)
             "/api/portal/maps/stage",
             HTTP_POST,
             portal_map_stage_handler
+        },
+        {
+            "/api/portal/maps/discard",
+            HTTP_POST,
+            portal_map_discard_handler
         },
         {
             "/api/portal/maps/apply",
