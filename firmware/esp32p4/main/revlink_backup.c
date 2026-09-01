@@ -11,7 +11,11 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "psa/crypto.h"
 #include "revlink_sd_storage.h"
 
@@ -258,6 +262,17 @@ static esp_err_t export_one(
     esp_err_t status = hash_file(absolute, size, digest);
     if (status != ESP_OK) return status;
 
+    /* Per-file progress; verbose by design, so raise the log level to see it. */
+    ESP_LOGD(
+        TAG,
+        "export %s (%llu bytes) heap=%u largest=%u stack_free=%u",
+        relative,
+        (unsigned long long)size,
+        (unsigned int)esp_get_free_heap_size(),
+        (unsigned int)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT),
+        (unsigned int)uxTaskGetStackHighWaterMark(NULL)
+    );
+
     uint8_t header[BACKUP_ENTRY_BYTES] = {0};
     memcpy(header, "RLE1", 4U);
     const size_t path_length = strlen(relative);
@@ -288,6 +303,15 @@ static esp_err_t export_one(
             break;
         }
         status = output->write(output->context, buffer, count);
+        if (status != ESP_OK) {
+            ESP_LOGE(
+                TAG,
+                "chunk write failed at %llu of %llu bytes remaining: %d",
+                (unsigned long long)remaining,
+                (unsigned long long)size,
+                (int)status
+            );
+        }
         remaining -= count;
     }
     free(buffer);
@@ -338,6 +362,7 @@ static esp_err_t walk_export(
         if (stat(child_absolute, &info) != 0) {
             status = ESP_FAIL;
         } else if (S_ISDIR(info.st_mode)) {
+            ESP_LOGD(TAG, "descend depth=%u %s", depth + 1U, child_relative);
             status = walk_export(
                 child_absolute,
                 child_relative,

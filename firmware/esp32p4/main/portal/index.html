@@ -481,6 +481,7 @@
     }
     function connectionError(error,{background=false,count=true}={}){
       if(sidecarUnavailable(error)){
+        if(background&&serverBusy())return true;
         if(background){
           if(count)connection.failureCount+=1;
           if(connection.failureCount>=BACKGROUND_FAILURE_THRESHOLD)beginReconnect();
@@ -572,7 +573,12 @@
       lastSync=sync.state;lastFileTotal=storage.totalFiles;
       renderDeviceSelector();updateStartupButtons()
     }
+    // The embedded HTTP server handles one request at a time. While a backup
+    // is streaming it owns the server for minutes, so polling during that
+    // window cannot succeed and only queues work behind the transfer.
+    function serverBusy(){return !!state.backupBusy}
     async function loadStatus(){
+      if(serverBusy())return;
       if(document.hidden||connection.offline||connection.statusLoading)return;
       connection.statusLoading=true;
       try{renderStatus(await jsonRequest('/api/portal/status',{timeoutMs:5000}))}
@@ -881,7 +887,7 @@
       state.backupBusy=busy;$('downloadBackup').disabled=busy;$('chooseRestore').disabled=busy;$('applyRestore').disabled=busy
     }
     async function downloadBackup(){
-      if(state.backupBusy)return;state.backupNotice=null;setBackupBusy(true);text('backupStatus','Preparing a verified logical backup…');$('backupStatus').className='backup-status warn';
+      if(state.backupBusy)return;state.backupNotice=null;setBackupBusy(true);text('backupStatus','Preparing a verified logical backup… this reads and checksums every cached file, so it can take several minutes. Leave this tab open.');$('backupStatus').className='backup-status warn';
       try{
         const response=await fetch('/api/portal/backup',{cache:'no-store'});
         if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.error||'Backup could not be created')}

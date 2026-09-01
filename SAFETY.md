@@ -112,18 +112,19 @@ device or a vehicle, or that could cause a write to reach the wrong target,
 please report it privately through GitHub's security advisory flow on this
 repository rather than in a public issue.
 
-## Known broken: logical backup export
+## Logical backup export takes minutes
 
-`GET /api/portal/backup` does not work. Do not rely on it, and do not treat a
-Sidecar as backed up because that button exists.
+`GET /api/portal/backup` reads and checksums every cached file, then streams
+them. On a card holding a few hundred megabytes of datalogs that is several
+minutes — 128 files took about two and a half on the reference Nano.
 
-Observed on an ESP32-P4-NANO: requesting it takes the device off the network.
-It no longer panics — `walk_export()` recursing to `BACKUP_MAX_DEPTH` with two
-4 KiB transfer buffers live at the leaf came to roughly 15.7 KiB of stack,
-comfortably past any stack this HTTP server can be given, and both buffers now
-come from the heap. But the request still never completes and the device stops
-responding afterwards, with no panic logged. The cause of that second failure
-has not been identified.
+The embedded HTTP server handles one request at a time, so nothing else is
+served while that runs. The portal used to poll `/api/portal/status` every
+2.5 seconds throughout and declare the Sidecar offline after three timeouts,
+about fifteen seconds in, while the backup was streaming perfectly well
+underneath. The portal now stops polling for the duration and does not treat
+a timeout during a known-busy period as a lost connection.
 
-Everything else on the portal — listing, sync, download, viewing — is
-unaffected and was exercised across several hundred requests without incident.
+Leave the tab open. The device stays healthy throughout: heap and stack are
+flat across the whole run, and the only thing that ends it early is the
+browser hanging up (`httpd_sock_err: error in recv : 104`).
