@@ -94,11 +94,16 @@ Claims here are limited to what has been verified on a real device.
 - Two-second BOOT-button safe shutdown with an idle attached AccessPort
 - A complete logical backup export downloaded end to end, 128 files, with the
   device staying up throughout
+- A map staged with no AccessPort attached, surviving a power cycle: restored
+  at boot with its recorded size and SHA-256 re-verified, and still pinned to
+  the part number it was saved for
 
 **Not yet accepted on hardware:**
 
 - Live map upload round-trip against a device
-- Automatic application of a staged map on attach
+- Automatic application of a staged map on attach. Staging, persistence and
+  the pin are accepted above; what remains unproven is the write itself,
+  which is the same unproven path as a manual map upload
 - Startup-screen replacement against a device
 - Powered-hub behavior with two AccessPorts attached
 - Cooperative cancellation and shutdown *during* an active sync
