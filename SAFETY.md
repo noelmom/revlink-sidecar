@@ -111,3 +111,19 @@ Please open an issue for ordinary bugs. For anything that could damage a
 device or a vehicle, or that could cause a write to reach the wrong target,
 please report it privately through GitHub's security advisory flow on this
 repository rather than in a public issue.
+
+## Known broken: logical backup export
+
+`GET /api/portal/backup` does not work. Do not rely on it, and do not treat a
+Sidecar as backed up because that button exists.
+
+Observed on an ESP32-P4-NANO: requesting it takes the device off the network.
+It no longer panics — `walk_export()` recursing to `BACKUP_MAX_DEPTH` with two
+4 KiB transfer buffers live at the leaf came to roughly 15.7 KiB of stack,
+comfortably past any stack this HTTP server can be given, and both buffers now
+come from the heap. But the request still never completes and the device stops
+responding afterwards, with no panic logged. The cause of that second failure
+has not been identified.
+
+Everything else on the portal — listing, sync, download, viewing — is
+unaffected and was exercised across several hundred requests without incident.

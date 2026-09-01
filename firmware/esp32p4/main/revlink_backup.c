@@ -147,19 +147,33 @@ static esp_err_t hash_stream(
     psa_status_t status =
         psa_hash_setup(&operation, PSA_ALG_SHA_256);
     if (status != PSA_SUCCESS) return ESP_FAIL;
-    uint8_t buffer[BACKUP_BUFFER_BYTES];
+    /*
+     * On the heap, not the stack. This runs at the leaf of a directory walk
+     * that recurses up to BACKUP_MAX_DEPTH, on the HTTP server task, with
+     * export_one's own transfer buffer already live one frame up. Two 4 KiB
+     * stack buffers under ten levels of recursion overflow any stack this
+     * server can reasonably be given.
+     */
+    uint8_t *buffer = malloc(BACKUP_BUFFER_BYTES);
+    if (buffer == NULL) {
+        psa_hash_abort(&operation);
+        return ESP_ERR_NO_MEM;
+    }
     uint64_t remaining = size;
     while (remaining > 0U) {
         const size_t requested =
-            remaining < sizeof(buffer) ? (size_t)remaining : sizeof(buffer);
+            remaining < BACKUP_BUFFER_BYTES
+                ? (size_t)remaining : BACKUP_BUFFER_BYTES;
         const size_t count = fread(buffer, 1U, requested, stream);
         if (count != requested
             || psa_hash_update(&operation, buffer, count) != PSA_SUCCESS) {
             psa_hash_abort(&operation);
+            free(buffer);
             return ESP_FAIL;
         }
         remaining -= count;
     }
+    free(buffer);
     size_t digest_length = 0U;
     status = psa_hash_finish(
         &operation,
@@ -256,11 +270,18 @@ static esp_err_t export_one(
 
     FILE *stream = fopen(absolute, "rb");
     if (stream == NULL) return ESP_FAIL;
-    uint8_t buffer[BACKUP_BUFFER_BYTES];
+    /* Heap, for the same reason as hash_stream: this frame sits under the
+     * recursive walk and must not carry 4 KiB of its own. */
+    uint8_t *buffer = malloc(BACKUP_BUFFER_BYTES);
+    if (buffer == NULL) {
+        fclose(stream);
+        return ESP_ERR_NO_MEM;
+    }
     uint64_t remaining = size;
     while (status == ESP_OK && remaining > 0U) {
         const size_t requested =
-            remaining < sizeof(buffer) ? (size_t)remaining : sizeof(buffer);
+            remaining < BACKUP_BUFFER_BYTES
+                ? (size_t)remaining : BACKUP_BUFFER_BYTES;
         const size_t count = fread(buffer, 1U, requested, stream);
         if (count != requested) {
             status = ESP_FAIL;
@@ -269,6 +290,7 @@ static esp_err_t export_one(
         status = output->write(output->context, buffer, count);
         remaining -= count;
     }
+    free(buffer);
     fclose(stream);
     return status;
 }
