@@ -28,16 +28,23 @@ PRs will be declined.
 Everything runs on your laptop. No board required.
 
 ```bash
-cmake -S firmware/test -B build/host
-cmake --build build/host
-ctest --test-dir build/host --output-on-failure
+./scripts/ci-local.sh
 ```
 
-Node is needed for the four portal tests:
+This is the same set of checks a maintainer runs before merging. It needs
+only a C compiler; CMake and Node are used when present and the script tells
+you what it skipped. Please run it before opening a pull request.
+
+To also build the firmware — both with device writes compiled in and with
+them compiled out — add `--full`. That needs ESP-IDF v6.0.2 and CMake/Ninja
+on your PATH:
 
 ```bash
-for f in firmware/test/portal_*.mjs; do node "$f"; done
+./scripts/ci-local.sh --full
 ```
+
+Both configurations must build. It is easy to add code that compiles only
+when writes are enabled, and the `--full` run is what catches it.
 
 ## Firmware builds
 

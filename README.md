@@ -114,11 +114,20 @@ The protocol, sync, storage, network, power, and safety logic are all built as
 plain C11 with no ESP-IDF dependency, so they run on your laptop:
 
 ```bash
-cmake -S firmware/test -B build/host && cmake --build build/host && ctest --test-dir build/host --output-on-failure
+./scripts/ci-local.sh
 ```
 
-That is 16 host suites plus 4 Node-based portal tests. CI runs them on every
-push.
+That runs 16 host suites, 4 Node-based portal tests, and the enclosure
+geometry baseline — about 20 seconds, and it needs only a C compiler. If you
+don't have CMake, the script compiles the tests directly with the same flags.
+
+Add `--full` to also build the firmware two ways (writes enabled and
+disabled). That one needs ESP-IDF v6.0.2 plus CMake and Ninja, and takes
+about two minutes.
+
+```bash
+./scripts/ci-local.sh --full
+```
 
 ## Repository layout
 
