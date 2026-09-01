@@ -22,7 +22,7 @@
       "path": "bootloader.bin",
       "offset": 8192,
       "size": 23280,
-      "sha256": "7bcc8650c9f523228f9ec64a526d7b2964f57aa5083df51564511ef7a7d990b7"
+      "sha256": "d850003b5d2894c3a4461954caa6e710bb2a09b74db680c52b5a1eedd185ad47"
     },
     {
       "path": "partition-table.bin",
@@ -39,8 +39,8 @@
     {
       "path": "revlink-sidecar.bin",
       "offset": 131072,
-      "size": 1359088,
-      "sha256": "5dc2023ec17b83d7693f0a29f2001cf8db6768b3c8a2bde8ff8b7d0b06c81451"
+      "size": 1359040,
+      "sha256": "a129309e8ba196c6e03bdf71148abc57d6f731d583d7ed0ee94e5d60d52e7e81"
     }
   ]
 }
