@@ -1,0 +1,2 @@
+# Controlled local-metadata maintenance profile. Never use for normal builds.
+CONFIG_REVLINK_LOCAL_METADATA_BACKFILL_ACCEPTANCE=y

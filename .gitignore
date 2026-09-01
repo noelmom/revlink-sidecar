@@ -1,0 +1,32 @@
+# ESP-IDF / CMake build output
+build/
+build-*/
+sdkconfig
+sdkconfig.old
+managed_components/
+*.elf
+*.bin
+*.map
+
+# Host test builds
+cmake-build-*/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local secrets — never commit
+*.env
+.env
+.env.*
+!*.env.example
+secrets.*
+wifi-credentials.*

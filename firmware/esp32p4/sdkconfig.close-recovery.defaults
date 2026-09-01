@@ -1,0 +1,20 @@
+# One-shot, read-only unclean-close recovery acceptance overlay.
+#
+# The first completed data phase deliberately omits 0x05. The application must
+# queue exactly one complete initialized recovery session, which must close
+# with the normal 0x05/0x35 exchange and software re-enumeration. No USB reset,
+# D+/D- isolation, upload, delete, format, or live-data command is permitted.
+CONFIG_REVLINK_USB_ROOT_PORT_POWER=y
+CONFIG_REVLINK_RUNTIME_SYNC=y
+CONFIG_REVLINK_SYNC_AUTO_ON_ATTACH_DEFAULT=y
+CONFIG_REVLINK_USB_CLOSE_RECOVERY_ACCEPTANCE=y
+# CONFIG_REVLINK_USB_SESSION_CYCLE_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_PC_MODE_EXIT_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_ROOT_LIST_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_DOWNLOAD_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_SESSION_CLOSE_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_IDLE_RELEASE_ACCEPTANCE is not set
+# CONFIG_REVLINK_ALLOW_DEVICE_WRITES is not set
+# CONFIG_REVLINK_SD_FORMAT_ACCEPTANCE is not set

@@ -1,0 +1,69 @@
+# Waveshare ESP32-P4-WIFI6-DEV-KIT, SKU 32054.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+
+# Use a recovery factory image plus two 4 MiB OTA slots. Updated images boot
+# pending verification and automatically roll back if they crash or reboot
+# before the application explicitly marks the release healthy.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Factory reset GPIO selection is intentionally deferred until the complete
+# product button map and pin audit are approved. Do not bind a boot-time erase
+# gesture to the development board's BOOT key by accident.
+# CONFIG_BOOTLOADER_FACTORY_RESET is not set
+
+# ESP32-P4NRW32 includes 32 MB stacked hex-mode PSRAM.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_HEX=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_USE_MALLOC=y
+
+# Keep early bring-up diagnostics on the WCH USB-to-UART bridge.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# The C6 transport is opt-in until a network product profile is selected.
+# Merely fetching the managed components must not claim the SD/MMC controller.
+# CONFIG_ESP_WIFI_REMOTE_ENABLED is not set
+# CONFIG_ESP_HOSTED_ENABLED is not set
+
+# Storage acceptance performs FAT mount/remount and hashing from app_main.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
+
+# The development kit may route its USB-A connector through an onboard hub.
+CONFIG_USB_HOST_HUBS_SUPPORTED=y
+# CONFIG_USB_HOST_HUB_MULTI_LEVEL is not set
+
+# High-speed VBUS and enumeration have passed live electrical acceptance.
+CONFIG_REVLINK_USB_ROOT_PORT_POWER=y
+
+# Runtime sync is built normally, but remains idle until a manual request or
+# explicit saved auto-sync policy. Fresh devices default to auto-sync off.
+CONFIG_REVLINK_RUNTIME_SYNC=y
+# CONFIG_REVLINK_SYNC_AUTO_ON_ATTACH_DEFAULT is not set
+
+# Interface lifecycle acceptance is an explicit post-enumeration gate.
+# CONFIG_REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE is not set
+
+# The first transaction gate is opt-in and sends one bounded read-only root
+# listing with no retries. It must remain disabled in normal firmware.
+# CONFIG_REVLINK_USB_ROOT_LIST_ACCEPTANCE is not set
+
+# The first file-content gate is also opt-in and atomically caches one bounded
+# datalog to microSD. It must remain disabled in normal firmware.
+# CONFIG_REVLINK_USB_DOWNLOAD_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_SESSION_CLOSE_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_SESSION_CYCLE_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_CLOSE_RECOVERY_ACCEPTANCE is not set
+
+# Guarded map transfers are a normal product capability. They remain locked
+# behind persistent, owner-controlled runtime consent and byte-identical
+# read-back verification. The exact startup-screen target shares this guarded
+# service. Deletes remain unavailable.
+CONFIG_REVLINK_ALLOW_DEVICE_WRITES=y

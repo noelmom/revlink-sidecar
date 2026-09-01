@@ -1,0 +1,21 @@
+# Waveshare ESP32-P4-NANO currently ships with ESP32-P4 revision 1.x silicon.
+# ESP-IDF treats pre-v3 and v3+ P4 silicon as mutually incompatible firmware
+# targets, so this overlay must be built in a clean, Nano-specific directory.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+
+# Revision 1.x supports a maximum application CPU clock of 360 MHz.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+# The compact enclosure mounts the removable SH1106 opposite the Dev Kit
+# prototype orientation. Let the controller reverse both axes.
+CONFIG_REVLINK_STATUS_OLED_ROTATE_180=y
+
+# Revision 1.x exposes less contiguous internal DMA memory after the Hosted
+# runtime starts. Keep the SDIO transport pool in DMA-capable PSRAM; Espressif
+# provides this option specifically for memory-intensive P4 Hosted workloads.
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+
+# Guarded device writes are part of the Nano product profile. Runtime owner
+# consent still defaults to locked, and deletion is not compiled.
+CONFIG_REVLINK_ALLOW_DEVICE_WRITES=y

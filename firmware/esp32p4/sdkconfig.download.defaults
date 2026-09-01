@@ -1,0 +1,12 @@
+# One-shot AccessPort datalog download acceptance overlay.
+#
+# This performs a single bounded, read-only directory listing and download to
+# an atomic microSD cache destination. AccessPort writes, deletes, retries,
+# formatting, live-data commands, and idle-release behavior remain disabled.
+CONFIG_REVLINK_USB_ROOT_PORT_POWER=y
+# CONFIG_REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE is not set
+# CONFIG_REVLINK_USB_ROOT_LIST_ACCEPTANCE is not set
+CONFIG_REVLINK_USB_DOWNLOAD_ACCEPTANCE=y
+# CONFIG_REVLINK_USB_IDLE_RELEASE_ACCEPTANCE is not set
+# CONFIG_REVLINK_ALLOW_DEVICE_WRITES is not set
+# CONFIG_REVLINK_SD_FORMAT_ACCEPTANCE is not set

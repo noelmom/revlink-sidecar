@@ -1,0 +1,18 @@
+# RevLink ESP32-P4 16 MiB recovery/OTA partition table.
+#
+# The factory slot is the immutable recovery image. Normal releases alternate
+# between ota_0 and ota_1. User files remain on microSD; internal flash keeps
+# only firmware, boot selection, settings, and a reserved bounded crash slot.
+#
+# App partitions begin on 64 KiB boundaries as required by ESP-IDF. The
+# unallocated region after coredump is deliberately reserved for the future
+# production credential/security layout; do not consume it ad hoc.
+#
+# Name,     Type, SubType, Offset,    Size,       Flags
+nvs,        data, nvs,     0x009000,  0x006000,
+otadata,    data, ota,     0x00f000,  0x002000,
+phy_init,   data, phy,     0x011000,  0x001000,
+factory,    app,  factory, 0x020000,  0x400000,
+ota_0,      app,  ota_0,   0x420000,  0x400000,
+ota_1,      app,  ota_1,   0x820000,  0x400000,
+coredump,   data, coredump,0xc20000,  0x010000,

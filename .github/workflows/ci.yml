@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  host-tests:
+    name: Host tests (C)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S firmware/test -B build/host -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build/host --parallel
+
+      - name: Test
+        run: ctest --test-dir build/host --output-on-failure
+
+  portal-tests:
+    name: Portal tests (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run portal tests
+        run: |
+          status=0
+          for f in firmware/test/portal_*.mjs; do
+            echo "==> $f"
+            node "$f" || status=1
+          done
+          exit $status
+
+  enclosure-geometry:
+    name: Enclosure geometry baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Report STL topology
+        working-directory: hardware/nano-enclosure
+        run: |
+          python3 tools/stl_inspect.py \
+            enclosure-print/source/esp32-p4-nano-bottom.stl \
+            enclosure-print/source/esp32-p4-nano-top-solid.stl \
+            enclosure-print/print-package/01-revlink-sidecar-nano-bottom.stl \
+            enclosure-print/print-package/02-revlink-sidecar-nano-top-oled-usbc-controls.stl \
+            enclosure-print/print-package/03-revlink-sidecar-nano-usbc-side-buttons-pair.stl

@@ -1,0 +1,56 @@
+RevLink Sidecar
+Copyright 2026 RevLink Sidecar contributors
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+--------------------------------------------------------------------------
+Hardware
+--------------------------------------------------------------------------
+
+Files under hardware/ are licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0), included as
+LICENSE-hardware.
+
+The Nano enclosure is derived from a third-party 55 x 55 mm case for the
+Waveshare ESP32-P4-NANO. The unmodified donor geometry is retained under
+hardware/nano-enclosure/enclosure-print/source/ for reference and diffing.
+
+--------------------------------------------------------------------------
+Trademarks
+--------------------------------------------------------------------------
+
+This is an independent, unofficial project. It is not affiliated with,
+endorsed by, sponsored by, or approved by COBB Tuning Products, LLC, or by
+Waveshare Electronics or Espressif Systems.
+
+"COBB" and "AccessPORT" are trademarks of COBB Tuning Products, LLC.
+"ESP32", "ESP32-P4", and "ESP-IDF" are trademarks of Espressif Systems.
+"Waveshare" is a trademark of Waveshare Electronics.
+
+These marks are used solely in a nominative sense, to identify the hardware
+and software this project interoperates with. No claim is made to any of
+them, and no endorsement is implied.
+
+--------------------------------------------------------------------------
+Interoperability
+--------------------------------------------------------------------------
+
+The AccessPort file-transfer protocol implemented here was determined by
+observing USB traffic between an AccessPort and its own host software, for the
+sole purpose of interoperating with hardware the user already owns. This
+project contains no COBB source code, firmware, calibration data, or map
+content, and it does not modify, redistribute, or circumvent any COBB
+software.
+
+This project reads and writes files. It does not flash ECUs, does not perform
+real-time tuning, and does not interpret or generate calibration data.

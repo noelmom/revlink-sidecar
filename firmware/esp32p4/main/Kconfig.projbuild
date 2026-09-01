@@ -1,0 +1,404 @@
+menu "RevLink safety"
+
+config REVLINK_WIFI_SCAN_ACCEPTANCE
+    bool "TEST ONLY: scan with the onboard ESP32-C6 radio"
+    default n
+    help
+        Starts the ESP32-P4 to ESP32-C6 hosted Wi-Fi transport over the
+        board's 4-bit SDIO link and performs one bounded station scan.
+
+        The test never accepts credentials, joins a network, persists Wi-Fi
+        configuration, starts an access point or server, or logs SSIDs/BSSIDs.
+        Only the detected AP count, strongest RSSI, and strongest channel are
+        reported. It is independent of AccessPort USB and device writes.
+
+        Leave disabled except during the radio coexistence acceptance test.
+
+config REVLINK_WIFI_JOIN_ACCEPTANCE
+    bool "TEST ONLY: accept one ephemeral Wi-Fi join from the local console"
+    default n
+    depends on REVLINK_WIFI_SCAN_ACCEPTANCE
+    depends on REVLINK_DEV_CONSOLE
+    help
+        Adds a local-only "wifi-join" development command. The command reads
+        an SSID and password without echoing either value, stores them only in
+        RAM, attempts one bounded station association and DHCP cycle, and
+        performs one fixed DNS lookup after connection.
+
+        Credentials are never written to NVS, microSD, logs, source, or the
+        firmware image. No hotspot or server is started. This test is
+        independent of AccessPort USB and cannot authorize a device write.
+
+        Leave disabled except during the controlled radio connection
+        acceptance test.
+
+config REVLINK_NETWORK_RUNTIME_ACCEPTANCE
+    bool "TEST ONLY: run client-first network policy with hotspot fallback"
+    default n
+    depends on REVLINK_WIFI_JOIN_ACCEPTANCE
+    depends on REVLINK_DEV_CONSOLE
+    help
+        Connects the platform-neutral revlink_network coordinator to the
+        onboard ESP32-C6 radio adapter. A saved station is preferred;
+        failed or unavailable station connectivity falls back to a WPA2
+        hotspot named RevLink-<factory MAC suffix>.
+
+        The local console supplies both station and hotspot credentials
+        without echo. A station credential is persisted only after successful
+        association; the rotating hotspot credential remains RAM-only.
+        Credentials are never logged or returned by an API. Network changes
+        are rejected while a file transfer is active. This profile starts no
+        public internet service and cannot authorize an AccessPort write.
+
+        Leave disabled except during controlled product-network acceptance.
+
+config REVLINK_ONBOARDING_ACCEPTANCE
+    bool "TEST ONLY: serve local Wi-Fi onboarding and captive discovery"
+    default n
+    depends on REVLINK_NETWORK_RUNTIME_ACCEPTANCE
+    help
+        Serves a bounded local onboarding page and JSON API on port 80,
+        answers captive DNS only while the private fallback hotspot is ready,
+        and advertises a unique revlink-xxxxxx.local mDNS hostname.
+
+        Credential submission is accepted only from hotspot mode while no
+        file transfer is active. It requires a non-simple request header,
+        applies strict body limits, never logs credentials, and hands them
+        directly to the network runtime after the HTTP response. A working
+        station credential is saved atomically in NVS and reused after normal
+        restart and firmware update. Failed credentials never replace the last
+        working record. Hardware-backed encrypted NVS remains a production
+        key/eFuse acceptance requirement.
+        It does not enable AccessPort writes or public-internet access.
+
+config REVLINK_SD_SPI_TRANSPORT
+    bool "Use SPI3 for microSD instead of the SD/MMC controller"
+    default y if REVLINK_WIFI_SCAN_ACCEPTANCE
+    default n
+    help
+        Routes the onboard microSD socket through SPI3 using its existing
+        wires: CLK GPIO43, MOSI/CMD GPIO44, MISO/D0 GPIO39, and CS/D3 GPIO42.
+
+        This frees the P4 SD/MMC controller for the onboard ESP32-C6 hosted
+        Wi-Fi SDIO link. The OLED remains isolated on SPI2. Filesystem and
+        cache behavior are unchanged, and automatic formatting remains
+        independently locked.
+
+config REVLINK_STATUS_OLED
+    bool "Enable the 1.3-inch SH1106 SPI status display"
+    default n
+    help
+        Drives the removable 128x64 SH1106 prototype OLED through the 40-pin
+        expansion header. The P4 adapter uses GPIO23 SCLK, GPIO22 MOSI,
+        GPIO21 CS, GPIO20 D/C, and GPIO2 RESET. It never owns USB, microSD,
+        Wi-Fi SDIO, audio, or strapping pins.
+
+        Display failure is non-fatal and cannot authorize a sync or write.
+
+config REVLINK_STATUS_OLED_ROTATE_180
+    bool "Rotate the SH1106 status display 180 degrees"
+    default n
+    depends on REVLINK_STATUS_OLED
+    help
+        Reverses both the SH1106 segment remap and COM scan direction so the
+        complete display is rotated in hardware without transforming the
+        framebuffer. Enable this in a board-specific sdkconfig overlay when
+        the enclosure mounts the OLED upside down.
+
+config REVLINK_DEV_CONSOLE
+    bool "Enable the local UART development control console"
+    default n
+    depends on REVLINK_RUNTIME_SYNC
+    help
+        Adds a fixed-command UART adapter for status, manual read-only sync,
+        cooperative cancel, and saved auto-sync policy. It calls the same
+        transport-neutral revlink_control service intended for future HTTP
+        and BLE adapters.
+
+        The parser accepts no paths, filenames, credentials, upload, delete,
+        format, or arbitrary protocol command.
+
+config REVLINK_LOCAL_METADATA_BACKFILL_ACCEPTANCE
+    bool "MAINTENANCE ONLY: repair development Initial sync timestamps"
+    default n
+    depends on REVLINK_DEV_CONSOLE
+    help
+        Adds local-UART maintenance commands for zero-only legacy backfill and
+        an owner-directed datalog20..58,1,2 filename-wrap resequence in the
+        last unambiguous microSD device namespace. Both require explicit Unix
+        time inputs and use the existing atomic manifest/history writers.
+
+        It never communicates with or writes to the AccessPort, and it never
+        changes cached file bytes, paths, hashes, device timestamps, or notes.
+        Leave disabled in normal firmware.
+
+config REVLINK_RUNTIME_SYNC
+    bool "Build the bounded runtime datalog-sync coordinator"
+    default y
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    help
+        Builds the normal event-driven read-only synchronization path.
+        Merely enabling this capability does not start a file session.
+        A session must be requested manually or by the saved auto-sync policy.
+
+        Every session retains the accepted four-file, 16 MiB, no-retry bounds.
+        This option does not enable uploads, deletes, live data, or any
+        AccessPort storage write.
+
+config REVLINK_SYNC_AUTO_ON_ATTACH_DEFAULT
+    bool "Default auto-sync policy for unconfigured devices"
+    default n
+    depends on REVLINK_RUNTIME_SYNC
+    help
+        Used only when the persistent auto-sync setting has never been saved.
+        Leave disabled for shipping and development defaults. A user may later
+        opt in through the runtime settings API.
+
+config REVLINK_USB_ROOT_PORT_POWER
+    bool "Power the high-speed USB Host root port at startup"
+    default n
+    help
+        Enables logical power on ESP32-P4 USB peripheral 0, the high-speed
+        OTG 2.0 root port.
+
+        Leave disabled until the USB-A port is empty and the no-load VBUS
+        stage has been verified. This setting does not substitute for a
+        protected, current-limited external VBUS path.
+
+config REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    bool "Claim and release AccessPort interface 0 without transfers"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    help
+        After descriptor acceptance succeeds, claim interface 0, allocate its
+        endpoint pipes, and immediately release the interface. This gate does
+        not submit a bulk transfer or proprietary AccessPort request.
+
+        Leave disabled except during the explicitly authorized interface
+        lifecycle acceptance test.
+
+config REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    bool "TEST ONLY: perform one bounded read-only root listing"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    help
+        After descriptor acceptance succeeds for a newly attached physical
+        device, claim interface 0 and transmit exactly one capture-verified
+        empty-path 0x1626 directory-list request on endpoint 0x03. Read at
+        most 8192 bytes from endpoint 0x82 with a hard deadline, validate the
+        response frame and checksum, parse the complete listing payload, then
+        release the interface. A detach followed by a new attach creates a
+        fresh bounded acceptance session without rebooting the board.
+
+        There are no retries and no file-content, upload, delete, live-data,
+        reset, or disconnect transactions. Leave disabled after this
+        separately authorized read-only acceptance test.
+
+config REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    bool "TEST ONLY: cache one bounded datalog to microSD"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    depends on !REVLINK_SD_FORMAT_ACCEPTANCE
+    help
+        For each newly attached physical device, claim interface 0 once, list
+        the datalog directory once, select the smallest non-empty .csv or
+        .csv.gz file no larger than 8 MiB, and perform one capture-verified
+        0x1620/0x1621 read-only download.
+
+        File bytes are streamed through a bounded decoder into a temporary
+        microSD file. Protocol framing, declared size, trailer integrity,
+        persisted size, fsync, SHA-256, and atomic rename must all succeed
+        before the cache file becomes visible. There are no retries and no
+        AccessPort upload, delete, live-data, reset, or disconnect commands.
+
+        Leave disabled except during the separately authorized read-only
+        download acceptance test.
+
+config REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE
+    bool "TEST ONLY: incrementally cache bounded datalogs to microSD"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    depends on !REVLINK_SD_FORMAT_ACCEPTANCE
+    help
+        For each newly attached physical device, claim interface 0 once and
+        list the datalog directory once. Verify manifest-matching cache entries
+        by SHA-256 and skip them. Download at most four missing or changed
+        files and at most 16 MiB per attachment session, using the same bounded
+        streaming decoder and atomic cache sink proven by the one-file
+        acceptance test.
+
+        Each successful file publishes a complete manifest snapshot through
+        flush, fsync, and atomic rename. Interrupted temporary files never
+        become cache entries, and a later session resumes from the last
+        published manifest. Session cleanup releases the selected per-device
+        storage namespace so a later attachment cannot inherit stale state.
+        There are no retries and no AccessPort upload, delete, live-data,
+        reset, or disconnect commands.
+
+        Leave disabled except during a separately authorized read-only
+        incremental-sync acceptance test.
+
+config REVLINK_USB_SESSION_CLOSE_ACCEPTANCE
+    bool "TEST ONLY: send one capture-verified polite session close"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    depends on !REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    help
+        For a newly attached AccessPort, claim interface 0 and send exactly
+        one capture-verified mini subtype 0x05 session-close request. Wait
+        briefly for subtype 0x35, then release the interface. The AccessPort
+        normally performs a software re-enumeration roughly 0.6 seconds later.
+
+        This operation does not list, download, upload, delete, reset storage,
+        or modify any AccessPort file. Leave disabled except during an
+        explicitly authorized session-lifecycle acceptance test.
+
+config REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    bool "TEST ONLY: release the logical USB root port after enumeration"
+    default n
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    help
+        After descriptor-only AccessPort acceptance, wait five seconds and
+        stop the ESP-IDF logical root port. This submits no proprietary or
+        bulk transaction. It exists only to determine whether removing the
+        active data link is sufficient for the AccessPort to return to
+        Gauges while it remains powered from the vehicle.
+
+        This cannot control physical USB-A VBUS on the Waveshare development
+        board. Leave disabled in normal firmware.
+
+config REVLINK_USB_PC_MODE_EXIT_ACCEPTANCE
+    bool "TEST ONLY: sync, politely close, and release the USB root port"
+    default n
+    depends on REVLINK_RUNTIME_SYNC
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    depends on !REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE
+    depends on !REVLINK_USB_SESSION_CLOSE_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    help
+        Force one auto-sync for a newly attached AccessPort. After the normal
+        bounded read-only sync path sends the capture-verified mini subtype
+        0x05 close, releases interface 0, and publishes its terminal event,
+        stop the logical USB root port.
+
+        This exists only to verify that a complete host lifecycle returns the
+        still-powered AccessPort to Gauges without a physical unplug. It does
+        not enable uploads, deletes, formatting, live-data commands, or any
+        AccessPort storage write.
+
+config REVLINK_USB_SESSION_CYCLE_ACCEPTANCE
+    bool "TEST ONLY: repeat acknowledged sync/eject lifecycle"
+    default n
+    depends on REVLINK_RUNTIME_SYNC
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_PC_MODE_EXIT_ACCEPTANCE
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    depends on !REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE
+    depends on !REVLINK_USB_SESSION_CLOSE_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    help
+        Force one initial read-only auto-sync, then repeat the normal bounded
+        sync only after each acknowledged 0x05/0x35 close has produced a
+        software detach, fresh high-speed enumeration, and accepted
+        descriptor scan. Stop after the configured count or on the first
+        failed/cancelled session.
+
+        This validates that normal sessions return the AccessPort to Gauges
+        without a cable unplug, manual D+/D- switch, root-port shutdown,
+        upload, delete, format, live-data request, or storage write.
+
+config REVLINK_USB_SESSION_CYCLE_ACCEPTANCE_COUNT
+    int "Acknowledged lifecycle repetitions"
+    range 2 20
+    default 5
+    depends on REVLINK_USB_SESSION_CYCLE_ACCEPTANCE
+
+config REVLINK_USB_CLOSE_RECOVERY_ACCEPTANCE
+    bool "TEST ONLY: inject one unclean close and recover once"
+    default n
+    depends on REVLINK_RUNTIME_SYNC
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    depends on !REVLINK_USB_SESSION_CYCLE_ACCEPTANCE
+    depends on !REVLINK_USB_PC_MODE_EXIT_ACCEPTANCE
+    depends on !REVLINK_USB_INTERFACE_CLAIM_ACCEPTANCE
+    depends on !REVLINK_USB_ROOT_LIST_ACCEPTANCE
+    depends on !REVLINK_USB_DOWNLOAD_ACCEPTANCE
+    depends on !REVLINK_USB_INCREMENTAL_SYNC_ACCEPTANCE
+    depends on !REVLINK_USB_SESSION_CLOSE_ACCEPTANCE
+    depends on !REVLINK_USB_IDLE_RELEASE_ACCEPTANCE
+    depends on !REVLINK_ALLOW_DEVICE_WRITES
+    help
+        Force one initial read-only sync, deliberately omit its polite close,
+        and verify that the application queues exactly one bounded initialized
+        session-close recovery. The recovery must finish with an acknowledged
+        0x05/0x35 close and software re-enumeration.
+
+        This fault-injection mode does not upload, delete, format, issue
+        live-data requests, reset the USB bus, toggle D+/D-, or modify any
+        AccessPort file. Leave disabled in normal firmware.
+
+config REVLINK_ALLOW_DEVICE_WRITES
+    bool "Permit AccessPort write transactions"
+    default y
+    depends on REVLINK_RUNTIME_SYNC
+    depends on REVLINK_USB_ROOT_PORT_POWER
+    help
+        Compiles the guarded microSD-backed map-upload transport. New and
+        factory-reset Sidecars start with owner consent disabled. Once changed
+        in Settings, that preference persists until the owner changes it.
+        Destinations are allowlisted, the attached AccessPort identity is
+        pinned, and an upload is successful only after a fresh download
+        matches the source SHA-256.
+
+        This does not enable deletion. The same target-validated, staged,
+        identity-pinned, and read-back-verified service also carries the exact
+        images/startup_screen.fb workflow.
+
+config REVLINK_WRITE_ACCEPTANCE_PART_NUMBER
+    string "Write-acceptance AccessPort part-number pin"
+    default ""
+    depends on REVLINK_ALLOW_DEVICE_WRITES
+    help
+        Optional build-time identity pin for a controlled write-acceptance
+        image. When set, every upload is refused unless the authoritative
+        device identity exactly matches this part number. The donor acceptance
+        build pins AP3-VLK-002. This does not replace serial pinning, which is
+        captured separately for each runtime operation.
+
+config REVLINK_SD_FORMAT_ACCEPTANCE
+    bool "DESTRUCTIVE: format and provision the microSD card once"
+    default n
+    help
+        Erases and formats the onboard microSD card as FAT, creates the RevLink
+        directory layout, and runs a write, flush, atomic rename, unmount,
+        remount, and SHA-256 verification test.
+
+        Enable only for an explicitly authorized acceptance flash. Disable and
+        reflash immediately after the test so a later mount failure can never
+        trigger an automatic format.
+
+endmenu

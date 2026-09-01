@@ -1,0 +1,80 @@
+set(
+    REVLINK_MAIN_SOURCES
+    "revlink_main.c"
+    "revlink_backup.c"
+    "revlink_map_upload.c"
+    "revlink_dev_console.c"
+    "revlink_network_runtime.c"
+    "revlink_sidecar_identity.c"
+    "revlink_sd_storage.c"
+    "revlink_soft_power.c"
+    "revlink_status_oled.c"
+    "revlink_usb_link.c"
+    "revlink_wifi_radio.c"
+    "revlink_wifi_store.c"
+)
+
+set(
+    REVLINK_MAIN_REQUIRES
+    accessport_catalog
+    accessport_usb
+    esp_driver_gpio
+    esp_driver_sdmmc
+    esp_driver_sdspi
+    esp_driver_spi
+    esp_app_format
+    esp_system
+    esp_timer
+    esp_event
+    esp_http_server
+    esp_netif
+    esp_wifi
+    fatfs
+    spi_flash
+    heap
+    mbedtls
+    mdns
+    nvs_flash
+    qrcode
+    lwip
+    revlink_application
+    revlink_captive_dns
+    revlink_cli
+    revlink_control
+    revlink_credentials
+    revlink_identity
+    revlink_network
+    revlink_power
+    revlink_status
+    revlink_storage_recovery
+    revlink_sync
+    revlink_time
+    revlink_update
+    revlink_usb_control
+    sdmmc
+)
+
+if(CONFIG_REVLINK_ONBOARDING_ACCEPTANCE)
+    list(APPEND REVLINK_MAIN_SOURCES
+        "revlink_onboarding.c"
+        "revlink_portal.c"
+    )
+    list(APPEND REVLINK_MAIN_EMBED_FILES "portal/index.html")
+    list(APPEND REVLINK_MAIN_EMBED_BINARY_FILES
+        "portal/assets/accessport-render.webp"
+        "portal/assets/revlink-wordmark.png"
+    )
+endif()
+
+idf_component_register(
+    SRCS
+        ${REVLINK_MAIN_SOURCES}
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        ${REVLINK_MAIN_REQUIRES}
+    EMBED_TXTFILES
+        ${REVLINK_MAIN_EMBED_FILES}
+    EMBED_FILES
+        ${REVLINK_MAIN_EMBED_BINARY_FILES}
+)

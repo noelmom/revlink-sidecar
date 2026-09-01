@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>RevLink Sidecar</title>
+  <style>
+    :root {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f8ff;
+      background: #050812;
+      font-synthesis: none;
+      --bg: #050812; --panel: #0b1421; --panel2: #0e1928; --line: #22364d;
+      --blue: #58baff; --blue2: #5068ff; --green: #5ee59b; --amber: #ffcc68;
+      --red: #ff7889; --text: #f5f8ff; --muted: #8b9bb1; --nav: 218px;
+    }
+    * { box-sizing: border-box }
+    [hidden] { display: none !important }
+    html { min-height: 100%; background: var(--bg) }
+    body {
+      margin: 0; min-height: 100vh; min-height: 100dvh; overflow-x: hidden;
+      background: radial-gradient(circle at 82% -12%, #173c78 0, transparent 38%),
+        radial-gradient(circle at -10% 65%, #10294b 0, transparent 32%), var(--bg);
+    }
+    button, input, textarea, select { font: inherit }
+    button, a { -webkit-tap-highlight-color: transparent }
+    button { color: inherit }
+    .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
+    .app { display: grid; grid-template-columns: var(--nav) minmax(0,1fr); min-height: 100dvh }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 20; width: var(--nav);
+      display: flex; flex-direction: column; padding: 20px 14px;
+      background: #070d17e8; border-right: 1px solid #17283c; backdrop-filter: blur(18px);
+    }
+    .brand { display:flex;align-items:center;height:52px;padding:0 7px 20px }
+    .brand-wordmark { display:block;width:150px;height:auto;filter:drop-shadow(0 8px 22px #156bff35) }
+    .nav { display:grid;gap:5px }
+    .nav-button {
+      display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;border:1px solid transparent;
+      border-radius:11px;background:transparent;color:#8fa0b6;font-size:12px;font-weight:780;text-align:left;cursor:pointer
+    }
+    .nav-button:hover { color:#ddebfa;background:#101a28 }
+    .nav-button.active { color:#dff2ff;background:#12243a;border-color:#294763;box-shadow:inset 3px 0 #57b9ff }
+    .nav-icon { display:inline-grid;place-items:center;width:18px;color:#72c4ff;text-align:center;font-weight:900 }
+    .nav-icon svg,.sheet-icon svg,.mobile-icon svg { display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8 }
+    .sheet-icon { display:inline-grid;place-items:center;width:18px;color:#72c4ff;vertical-align:-4px }
+    .nav-badge { margin-left:auto;padding:3px 6px;border-radius:99px;background:#2c2514;color:#ffd16f;font-size:8px;letter-spacing:.05em }
+    .side-foot { margin-top:auto;padding:14px 9px 4px;border-top:1px solid #17283c;color:#73869c;font-size:10px;line-height:1.55 }
+    .side-foot strong { display:block;color:#b9c8d9;font-size:11px }
+    .main { grid-column:2;min-width:0;padding:0 24px 58px }
+    .build-footer { display:flex;justify-content:center;gap:8px;flex-wrap:wrap;width:min(1240px,100%);margin:30px auto 0;padding-top:18px;border-top:1px solid #17283c;color:#60738a;font:9px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em }
+    .build-footer span + span:before { content:"·";margin-right:8px;color:#31465e }
+    .topbar {
+      position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:14px;height:68px;
+      margin-inline:-24px;padding-inline:24px;
+      background:#050812d9;border-bottom:1px solid #17283c;backdrop-filter:blur(18px)
+    }
+    .page-kicker { color:#6dbfff;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase }
+    .page-name { margin-top:3px;font-size:18px;font-weight:880;letter-spacing:-.03em }
+    .top-state { margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0;color:#9aabc0;font-size:11px;font-weight:750 }
+    .top-state span { max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+    .dot { width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 13px var(--green);transition:.2s }
+    .dot.warn { background:var(--amber);box-shadow:0 0 13px var(--amber);animation:pulse 1.4s ease-in-out infinite }
+    .dot.bad { background:var(--red);box-shadow:0 0 13px var(--red);animation:none }
+    @keyframes pulse { 50% { opacity:.42 } }
+    .registration-status { color:#8fa1b8;border:1px solid #2a394d;border-radius:10px;padding:8px 10px;background:#0b121e;font-size:10px;font-weight:850;white-space:nowrap }
+    .registration-status.pending { color:#ffd273;border-color:#6a5428;background:#1d180e }
+    .registration-status.registered { color:#87efb0;border-color:#27593d;background:#0d1d15 }
+    .content { width:min(1240px,100%);margin:auto }
+    .dataset-bar { display:grid;grid-template-columns:auto minmax(280px,1fr) auto;align-items:center;gap:14px;margin:14px 0 0;padding:11px 13px;border:1px solid #28425f;border-radius:14px;background:linear-gradient(135deg,#0d1b2ced,#09121fed);box-shadow:0 12px 36px #0003 }
+    .dataset-copy { min-width:132px }.dataset-copy span{display:block;color:#6dbfff;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.dataset-copy small{display:block;margin-top:4px;color:#7e91aa;font-size:9px;white-space:nowrap}
+    .dataset-select { width:100%;min-width:0;border:1px solid #315071;border-radius:11px;padding:11px 34px 11px 12px;color:#dcecff;background:#09131f;font-size:11px;font-weight:800;outline:none }.dataset-select:focus{border-color:#58baff;box-shadow:0 0 0 3px #58baff1a}.dataset-select:disabled{opacity:.65}
+    .dataset-live { padding:7px 9px;border-radius:99px;background:#132239;color:#8ca0ba;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap }.dataset-live.good{background:#0d2a20;color:#6ce5a1}
+    .view { display:none;animation:appear .16s ease }
+    .view.active { display:block }
+    @keyframes appear { from { opacity:.3;transform:translateY(4px) } }
+    .hero { padding:44px 0 25px }
+    .eyebrow { color:#6dbfff;font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase }
+    h1 { margin:10px 0 8px;font-size:clamp(34px,5vw,62px);line-height:.98;letter-spacing:-.055em }
+    .hero p,.view-intro { margin:0;color:var(--muted);line-height:1.55;font-size:13px }
+    .section-head { display:flex;align-items:center;gap:18px;padding:28px 0 17px }
+    .section-head > p { max-width:650px;margin:0;color:var(--muted);font-size:12px;line-height:1.55 }
+    .panel { border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,#0e1928ec,#08111dec);box-shadow:0 22px 60px #0004;overflow:hidden }
+    .panel-inner { padding:20px }
+    .grid { display:grid;grid-template-columns:1.14fr .86fr;gap:13px }
+    .wide { grid-column:1/-1 }
+    .panel-head { display:flex;align-items:flex-start;gap:12px;margin-bottom:18px }
+    .panel-head h2 { margin:0;font-size:17px;letter-spacing:-.025em }
+    .panel-head p { margin:5px 0 0;color:var(--muted);font-size:11px }
+    .badge { margin-left:auto;padding:6px 9px;border-radius:99px;background:#102946;color:#7cc6ff;font-size:9px;font-weight:900;letter-spacing:.08em;white-space:nowrap;text-transform:uppercase }
+    .badge.good { background:#0d2a20;color:#6ce5a1 }.badge.warn{background:#30250f;color:#ffd273}.badge.bad{background:#32161d;color:#ff929d}
+    .device-layout { display:grid;grid-template-columns:128px 1fr;gap:20px;align-items:center }
+    .device-art { height:180px;border:1px solid #29415e;border-radius:26px;background:radial-gradient(circle at 50% 42%,#173a61 0,transparent 58%),linear-gradient(160deg,#101d2e,#070d16);display:grid;place-items:center;position:relative;overflow:hidden;box-shadow:inset 0 0 38px #3a85ff1c }
+    .device-art:after { content:"";position:absolute;inset:auto 16% 8px;height:1px;background:linear-gradient(90deg,transparent,#4a9eff66,transparent);box-shadow:0 0 22px #2985ff }
+    .device-render-wrap { position:relative;width:auto;height:166px;aspect-ratio:326/632;filter:drop-shadow(0 16px 17px #000a);transform:translateY(6px) }
+    .device-render { display:block;width:100%;height:100%;object-fit:contain }
+    .device-startup-preview { position:absolute;left:14%;top:7.8%;width:70.5%;height:52%;border:1px solid #293846;border-radius:4px;background:#02050a;box-shadow:inset 0 0 8px #0008;image-rendering:auto }
+    .device-startup-preview[hidden] { display:none }
+    .vehicle { font-size:19px;font-weight:850;letter-spacing:-.02em }.serial{margin-top:6px;color:#8194ad;font-size:11px;word-break:break-word}
+    .specs { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px }
+    .spec,.metric,.overview-card,.setting-card { padding:11px;border:1px solid #20344b;border-radius:12px;background:#09131f }
+    .spec span,.metric span,.overview-card span,.setting-card .label { display:block;color:#71859e;font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase }
+    .spec strong { display:block;margin-top:5px;font-size:11px;overflow:hidden;text-overflow:ellipsis }
+    .sync-state { display:flex;align-items:baseline;gap:9px }.sync-state strong{font-size:25px;letter-spacing:-.04em}.sync-state span{color:var(--muted);font-size:11px}
+    .progress { height:7px;margin:17px 0 9px;border-radius:99px;overflow:hidden;background:#142238 }.progress i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4fc2ff,#516cff);box-shadow:0 0 18px #4a8fff;transition:width .35s}.progress.busy i{width:40%;animation:loading 1.2s ease-in-out infinite alternate}@keyframes loading{to{transform:translateX(145%)}}
+    .sync-metrics { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 }.metric b{display:block;font-size:15px}.metric span{margin-top:3px}
+    .actions { display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:16px }
+    .btn { border:0;border-radius:12px;padding:12px 14px;color:white;background:linear-gradient(135deg,#51baff,#4468ff);font-weight:850;font-size:11px;cursor:pointer;box-shadow:0 9px 24px #286dff35 }
+    .btn.secondary { background:#142238;border:1px solid #2a405b;box-shadow:none }.btn.danger{background:#32161d;border:1px solid #6c2c38;box-shadow:none;color:#ffabb4}.btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+    .policy { display:flex;align-items:center;gap:10px;margin-top:16px;color:#a7b5c8;font-size:11px }
+    .backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.backup-actions .btn{flex:1;min-width:135px}.backup-status{margin-top:12px;padding:10px 11px;border:1px solid #29415e;border-radius:10px;background:#07101b;color:#8fa4bd;font-size:9px;line-height:1.5}.backup-status.ready{border-color:#285c43;color:#84e9b0}.backup-status.warn{border-color:#684f25;color:#ffd273}
+    .switch { position:relative;width:42px;height:23px;flex:0 0 auto }.switch input{position:absolute;opacity:0;pointer-events:none}.switch i{position:absolute;inset:0;border-radius:99px;background:#1d2b3e;border:1px solid #30445d;transition:.2s}.switch i:after{content:"";position:absolute;width:15px;height:15px;left:3px;top:3px;border-radius:50%;background:#92a1b5;transition:.2s}.switch input:checked+i{background:#174b74;border-color:#4baeff}.switch input:checked+i:after{transform:translateX(19px);background:#77c8ff}
+    .overview { display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px }.overview-card strong{display:block;margin-top:7px;font-size:18px}.overview-card small{display:block;margin-top:4px;color:#7789a0;font-size:9px}
+    .toolbar { display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end }
+    .tabs { display:flex;gap:5px }.tab,.select,.search { border:1px solid #29415e;border-radius:9px;padding:8px 10px;color:#a9bbcf;background:#09131f;font-size:10px;font-weight:800 }
+    .tab { cursor:pointer }.tab.active{color:#c9eaff;border-color:#438ed0;background:#102946}.select{padding-right:26px}.search{min-width:190px;outline:none}.search:focus{border-color:#55b8ff}
+    .chronology { margin:0 0 13px;color:#7489a2;font-size:10px;line-height:1.5 }
+    .file-actions { display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 11px;padding:10px 12px;border:1px solid #294763;border-radius:11px;background:#0d2034 }.file-actions.show{display:flex}.file-actions span{margin-right:auto;color:#b8cadc;font-size:11px}
+    .files { display:grid;gap:8px }
+    .file { display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:12px 13px;border:1px solid #1f3248;border-radius:13px;background:#09131f }
+    .file-check { width:17px;height:17px;accent-color:#52b7ff }.file-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#edf6ff;background:none;border:0;padding:0;font-size:12px;font-weight:850;text-align:left;cursor:pointer}.file-name:hover{color:#7ecaff}.file-meta{display:block;margin-top:4px;color:#70839a;font-size:9px}.file-locations{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px}.location-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:1px solid #2c4967;border-radius:99px;background:#0f2135;color:#9bcfff;font-size:8px;font-weight:850;letter-spacing:.035em}.location-badge:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}.location-badge.accessport{border-color:#295940;background:#0d241a;color:#72e6a5}.location-badge.cloud{border-color:#5c4d29;background:#211b0e;color:#ffd273}.location-note{color:#687c94;font-size:8px}.file-size{color:#9db0c7;font-size:10px;font-weight:750;text-align:right}.file-size small{display:block;margin-top:3px;color:#647990;font-size:8px;font-weight:650}
+    .row-buttons { display:flex;gap:6px }.icon-btn,.note-button{border:1px solid #2b4664;border-radius:9px;padding:7px 9px;color:#9ed3ff;background:#102239;font-size:9px;font-weight:850;cursor:pointer}.note-button.saved:after{content:"";display:inline-block;width:5px;height:5px;margin-left:5px;border-radius:50%;background:var(--green)}
+    .note-editor { display:none;grid-column:2/-1;gap:8px;padding-top:3px }.note-editor.open{display:grid}.note-editor textarea{width:100%;min-height:84px;resize:vertical;border:1px solid #2b4664;border-radius:10px;padding:10px;color:#edf6ff;background:#07101b;outline:none;line-height:1.45;font-size:11px}.note-editor textarea:focus{border-color:#55b8ff;box-shadow:0 0 0 3px #55b8ff1c}.map-tag-field{display:grid;gap:6px;color:#91a6be;font-size:9px;font-weight:850}.map-tag-field select{width:100%;border:1px solid #2b4664;border-radius:10px;padding:10px;color:#edf6ff;background:#07101b;outline:none;font-size:10px}.map-tag-field select:focus{border-color:#55b8ff;box-shadow:0 0 0 3px #55b8ff1c}.note-foot{display:flex;align-items:center;gap:8px}.note-foot small{margin-right:auto;color:#71859e}.note-foot .btn{padding:8px 11px}
+    .empty { padding:30px 17px;text-align:center;color:#7e91a9;border:1px dashed #263b53;border-radius:14px }
+    .settings-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px }.setting-card{padding:18px}.setting-card h3{margin:8px 0 7px;font-size:16px}.setting-card p{margin:0;color:var(--muted);font-size:11px;line-height:1.55}.setting-card .btn{margin-top:16px}.lock{color:#7fc5ff;font-weight:900}.device-identifier{display:block;margin-top:12px;padding:10px;border:1px solid #29415e;border-radius:9px;color:#9ed3ff;background:#07101b;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;line-height:1.5;overflow-wrap:anywhere;user-select:all}
+    .upload-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,360px);gap:18px;margin-bottom:13px;padding:18px}.upload-card h2{margin:7px 0;font-size:18px}.upload-card p{margin:0;color:var(--muted);font-size:11px;line-height:1.55}.upload-form{display:grid;gap:9px}.upload-form input{width:100%;border:1px solid #29415e;border-radius:10px;padding:10px 11px;color:#eaf5ff;background:#07101b;font-size:10px;outline:none}.upload-form input:focus{border-color:#58baff}.map-destination{display:grid;gap:6px;color:#91a6be;font-size:9px;font-weight:800}.map-destination>div{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;border:1px solid #29415e;border-radius:10px;background:#07101b;overflow:hidden}.map-destination>div:focus-within{border-color:#58baff}.map-destination strong{align-self:stretch;display:grid;place-items:center;padding:0 10px;border-right:1px solid #29415e;color:#75bfff;background:#0e1d2e;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px}.map-destination input{border:0;border-radius:0}.map-destination input:focus{border:0}.map-destination small{color:#6f849d;font-size:8px;font-weight:650}.upload-status{color:#83a0bd;font-size:9px;line-height:1.45}.upload-buttons{display:flex;gap:8px}.upload-buttons .btn{flex:1}
+    .image-overview{display:grid;grid-template-columns:minmax(230px,.72fr) minmax(0,1.28fr);gap:13px;margin-bottom:13px}.screen-panel{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:22px}.accessport-screen{position:relative;width:132px;height:214px;margin:auto;border:1px solid #345173;border-radius:28px;background:linear-gradient(160deg,#17273a,#070d16);box-shadow:inset 0 0 28px #4199ff1a,0 20px 45px #0005}.accessport-screen:before{content:"ACCESSPORT";position:absolute;top:14px;left:0;right:0;color:#ff6978;font-size:7px;font-weight:950;letter-spacing:.08em;text-align:center}.accessport-screen canvas{position:absolute;left:22px;top:35px;width:88px;height:117px;border:1px solid #314b69;border-radius:4px;background:#02050a;image-rendering:auto}.accessport-screen:after{content:"";position:absolute;left:45px;bottom:17px;width:40px;height:40px;border:7px solid #526478;border-radius:50%;box-shadow:0 -18px 0 -13px #526478}.screen-copy h2{margin:6px 0 8px;font-size:20px}.screen-copy p{margin:0;color:var(--muted);font-size:11px;line-height:1.55}.screen-specs{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}.screen-specs span{padding:6px 8px;border:1px solid #29415e;border-radius:8px;background:#07101b;color:#9db5cf;font-size:8px;font-weight:850}.image-section{margin-top:13px}.image-section .panel-inner{padding:18px}.image-library,.screenshot-library{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}.image-card{display:flex;flex-direction:column;min-width:0;padding:11px;border:1px solid #20344b;border-radius:14px;background:#09131f}.image-preview{display:grid;place-items:center;height:184px;border:1px solid #20344b;border-radius:10px;background:radial-gradient(circle at 50% 38%,#173a61 0,transparent 62%),#050a12;overflow:hidden;cursor:pointer}.image-preview canvas{width:auto;height:168px;aspect-ratio:3/4;border-radius:3px;background:#02050a}.image-preview img{width:100%;height:100%;object-fit:contain}.image-card strong{margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.image-card small{margin-top:4px;color:#71859e;font-size:8px}.image-card .btn{margin-top:10px;padding:9px 10px}.image-empty{grid-column:1/-1}.image-editor{width:min(840px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #315173;border-radius:20px;color:var(--text);background:#0a1321;box-shadow:0 30px 100px #000d}.image-editor::backdrop,.image-lightbox::backdrop{background:#02050bd9;backdrop-filter:blur(8px)}.editor-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #20344b}.editor-head div{min-width:0}.editor-head h2{margin:0;font-size:17px}.editor-head p{margin:4px 0 0;color:var(--muted);font-size:9px}.editor-head .close{margin-left:auto}.editor-body{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(280px,1.1fr);gap:20px;padding:18px;overflow:auto}.editor-preview{display:grid;place-items:center;min-height:390px;border:1px solid #20344b;border-radius:16px;background:radial-gradient(circle at 50% 35%,#173a61,#070d16 68%)}.editor-preview .accessport-screen{transform:scale(1.45)}.editor-controls{display:grid;align-content:start;gap:12px}.editor-controls label{display:grid;gap:6px;color:#9db0c7;font-size:9px;font-weight:800}.editor-controls input[type=text],.editor-controls input[type=file]{width:100%;border:1px solid #29415e;border-radius:10px;padding:11px;color:#eaf5ff;background:#07101b;font-size:10px}.editor-controls input[type=range]{width:100%;accent-color:#58baff}.editor-note{padding:11px;border:1px solid #29415e;border-radius:11px;color:#8ca0b8;background:#07101b;font-size:9px;line-height:1.5}.editor-actions{display:flex;gap:8px;margin-top:4px}.editor-actions .btn{flex:1}.image-lightbox{width:min(900px,calc(100% - 24px));height:min(720px,calc(100dvh - 24px));padding:52px 14px 14px;border:1px solid #315173;border-radius:18px;background:#07101b}.image-lightbox img{width:100%;height:100%;object-fit:contain}.image-lightbox .close{position:absolute;right:12px;top:10px;color:white}
+    .map-dialog{width:min(760px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #315173;border-radius:20px;color:var(--text);background:#0a1321;box-shadow:0 30px 100px #000d}.map-dialog::backdrop{background:#02050bd9;backdrop-filter:blur(8px)}.map-detail-body{display:grid;gap:16px;padding:20px;overflow:auto}.map-detail-summary{display:flex;align-items:flex-start;gap:13px}.map-detail-summary>div{min-width:0}.map-detail-summary h2{margin:6px 0 7px;font-size:24px;line-height:1.08;overflow-wrap:anywhere}.map-detail-summary p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}.compatibility{margin-left:auto;flex:0 0 auto;padding:7px 10px;border:1px solid #5c4d29;border-radius:99px;background:#211b0e;color:#ffd273;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.compatibility.good{border-color:#295940;background:#0d241a;color:#72e6a5}.compatibility.unknown{border-color:#2c4967;background:#0f2135;color:#9bcfff}.map-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.map-detail-item{padding:12px;border:1px solid #20344b;border-radius:12px;background:#07101b}.map-detail-item span{display:block;color:#71859e;font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.map-detail-item strong{display:block;margin-top:6px;color:#e6f2ff;font-size:11px;overflow-wrap:anywhere}.map-feature-list{display:flex;gap:6px;flex-wrap:wrap}.map-feature-list span{padding:6px 8px;border:1px solid #29415e;border-radius:8px;background:#0d1b2b;color:#9dcfff;font-size:8px;font-weight:800}.map-detail-note{padding:11px;border:1px solid #29415e;border-radius:11px;color:#8ca0b8;background:#07101b;font-size:9px;line-height:1.5}.map-detail-actions{display:flex;justify-content:flex-end;gap:8px}
+    .download-list{display:grid;gap:8px}.download-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid #20344b;border-radius:12px;background:#07101b}.download-item div{min-width:0;margin-right:auto}.download-item strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.download-item small{display:block;margin-top:4px;color:#71859e;font-size:8px}.download-item .btn{flex:0 0 auto;padding:8px 10px}
+    .accessport-screen:after{left:50%;bottom:14px;width:30px;height:30px;border-width:5px;transform:translateX(-50%);box-shadow:0 -14px 0 -10px #526478}
+    .beta-card { padding:26px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:18px }.beta-card h2{margin:8px 0;font-size:24px}.beta-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.6}.beta-orb{display:grid;place-items:center;width:86px;height:86px;border-radius:28px;background:radial-gradient(circle at 35% 30%,#58baff,#243aaf 72%);box-shadow:0 18px 55px #356fff42;font-size:27px;font-weight:900}
+    .health-head{display:flex;align-items:flex-end;gap:18px;padding:28px 0 17px}.health-head>div:first-child{min-width:0}.health-head h1{margin:8px 0 7px;font-size:clamp(31px,4vw,48px)}.health-head p{max-width:690px;margin:0;color:var(--muted);font-size:12px;line-height:1.55}.health-controls{display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}.health-controls label{display:grid;gap:5px;color:#71859e;font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.health-controls .select{min-width:118px}
+    .health-summary{display:grid;grid-template-columns:1.15fr repeat(3,minmax(115px,.45fr));gap:10px;margin-bottom:13px}.health-primary,.health-stat{padding:18px}.health-primary{display:flex;align-items:center;gap:16px}.health-score{display:grid;place-items:center;flex:0 0 92px;width:92px;height:92px;border:8px solid #28415d;border-radius:50%;background:#07101b;box-shadow:inset 0 0 28px #4ca9ff18}.health-score strong{display:block;font-size:30px;line-height:.9;letter-spacing:-.06em}.health-score small{display:block;margin-top:6px;color:#7488a2;font-size:8px;text-align:center}.health-primary h2{margin:6px 0;font-size:20px}.health-primary p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}.health-stat span{display:block;color:#71859e;font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.health-stat strong{display:block;margin-top:12px;font-size:21px}.health-stat small{display:block;margin-top:5px;color:#73869e;font-size:9px;line-height:1.4}
+    .health-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.72fr);gap:13px}.health-chart-panel,.health-detail{padding:18px}.health-chart-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}.health-chart-head h2,.health-detail h2{margin:0;font-size:17px}.health-chart-head p,.health-detail>p{margin:5px 0 0;color:var(--muted);font-size:9px;line-height:1.5}.health-legend{display:flex;align-items:center;gap:10px;margin-left:auto;color:#7c8fa7;font-size:8px;white-space:nowrap}.health-legend i{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%}.health-canvas-wrap{height:300px;border:1px solid #1d3046;border-radius:14px;background:linear-gradient(180deg,#08121e,#07101a);overflow:hidden;touch-action:none}.health-canvas-wrap canvas{display:block;width:100%;height:100%}.health-scrub{width:100%;margin:12px 0 0;accent-color:#59baff}.health-empty{display:grid;place-items:center;height:100%;padding:24px;color:#778ba4;text-align:center;font-size:11px;line-height:1.5}
+    .health-point-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.health-point-meta span{padding:6px 8px;border:1px solid #29415e;border-radius:99px;background:#0d1b2b;color:#9db4cc;font-size:8px;font-weight:850}.health-map{padding:11px;border:1px solid #29415e;border-radius:11px;background:#07101b}.health-map span{display:block;color:#6dbfff;font-size:8px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.health-map strong{display:block;margin-top:6px;font-size:11px;overflow-wrap:anywhere}.health-signals{display:grid;gap:7px;margin-top:12px}.health-signal{padding:10px;border:1px solid #273a50;border-left:3px solid #5f7892;border-radius:9px;background:#09131f}.health-signal.warn{border-left-color:var(--amber)}.health-signal.bad{border-left-color:var(--red)}.health-signal.good{border-left-color:var(--green)}.health-signal strong{display:block;font-size:10px}.health-signal small{display:block;margin-top:4px;color:#7589a1;font-size:8px;line-height:1.45}.health-footer{display:flex;gap:8px;margin-top:13px}.health-footer .btn{flex:1}.health-version{margin-top:10px;color:#566b84;font:8px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .investigation-card{margin-top:13px;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}.investigation-card h2{margin:6px 0;font-size:17px}.investigation-card p{margin:0;max-width:760px;color:var(--muted);font-size:10px;line-height:1.55}
+    .mobile-nav { display:none }
+    .more-sheet { display:none }
+    .toast { position:fixed;left:calc(50% + var(--nav)/2);bottom:max(22px,env(safe-area-inset-bottom));transform:translate(-50%,18px);width:min(400px,calc(100% - 32px));padding:12px 14px;border:1px solid #315173;border-radius:12px;background:#102035f2;color:#dce9f8;box-shadow:0 18px 50px #0009;opacity:0;pointer-events:none;transition:.2s;z-index:90;font-size:11px;text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
+    .connection-notice { position:fixed;z-index:75;top:82px;left:calc(50% + var(--nav)/2);transform:translateX(-50%);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:13px;width:min(590px,calc(100% - var(--nav) - 40px));padding:14px 15px;border:1px solid #765b28;border-radius:15px;background:#17150ff2;box-shadow:0 18px 55px #0009;backdrop-filter:blur(18px)}
+    .connection-symbol { display:grid;place-items:center;width:38px;height:38px;border:1px solid #80642d;border-radius:12px;background:#30250f;color:#ffd273;font-size:17px;font-weight:950 }
+    .connection-copy strong { display:block;font-size:12px }.connection-copy p{margin:4px 0 0;color:#aeb9c8;font-size:10px;line-height:1.45}.connection-copy small{display:block;margin-top:4px;color:#d6b76e;font-size:9px;font-weight:800}
+    .connection-actions { display:flex;gap:7px }.connection-actions .btn{padding:9px 11px;white-space:nowrap}.connection-notice.final{border-color:#74323d;background:#1e1015f2}.connection-notice.final .connection-symbol{border-color:#79404a;background:#32161d;color:#ff929d}.connection-notice.final .connection-copy small{color:#ff9ca7}
+    .viewer { display:none;position:fixed;inset:0;z-index:80;background:#070b14;color:#f4f7ff;overflow:auto }.viewer.open{display:block}
+    .viewer-head { position:sticky;top:0;z-index:4;display:flex;align-items:center;gap:12px;min-height:65px;padding:10px 18px;border-bottom:1px solid #202a3d;background:#090d17f2;backdrop-filter:blur(18px) }.viewer-title{min-width:0}.viewer-title b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.viewer-title span{color:#7f8da2;font-size:9px}.viewer-modes{display:flex;margin-left:auto}.viewer-modes .tab{border-radius:0}.viewer-modes .tab:first-child{border-radius:9px 0 0 9px}.viewer-modes .tab:last-child{border-radius:0 9px 9px 0}.close{width:38px;height:38px;border:1px solid #2d3a50;border-radius:10px;background:#111827;font-size:18px;cursor:pointer}
+    .viewer-tools { display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid #1b2637;background:#0b101b;flex-wrap:wrap }.viewer-tools .search{flex:1;min-width:150px}.viewer-tools .btn{padding:9px 11px}
+    .profile-strip { display:flex;gap:6px;overflow:auto;padding:9px 18px;border-bottom:1px solid #1b2637;scrollbar-width:none }.profile-strip::-webkit-scrollbar{display:none}
+    .chart-stage { min-height:480px;padding:12px 16px 8px }.single-chart,.split-card{position:relative;border:1px solid #202c40;border-radius:12px;background:#0b101c;overflow:hidden}.single-chart{height:clamp(460px,68vh,760px)}.split-grid{display:grid;gap:8px}.split-card{height:220px}.chart-label{position:absolute;left:12px;top:9px;z-index:2;padding:4px 7px;border-radius:7px;background:#0b101cdd;color:#aab7ca;font-size:9px;font-weight:800}.chart-empty{display:grid;place-items:center;height:100%;color:#6f7d91;font-size:11px}canvas{display:block;width:100%;height:100%}
+    .channel-browser { padding:10px 18px 22px;border-top:1px solid #1b2637;background:#0b101b }.channel-chips{display:flex;gap:6px;flex-wrap:wrap}.channel{border:1px solid #29364b;border-radius:99px;padding:6px 9px;background:#111827;color:#8391a6;font-size:9px;cursor:pointer}.channel.active{color:#e7f4ff;border-color:#4b82ba;background:#13263d}.swatch{display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:50%}.viewer-loading{display:grid;place-items:center;min-height:60vh;color:#91a1b7}.tooltip{position:fixed;z-index:95;display:none;pointer-events:none;max-width:260px;padding:8px 10px;border:1px solid #34435b;border-radius:9px;background:#111827f5;box-shadow:0 12px 35px #0008;font-size:9px}.tooltip.show{display:block}.tooltip b{display:block;margin-bottom:4px}.tooltip div{display:flex;justify-content:space-between;gap:14px;color:#aebcd0}
+    @media print { .viewer-head,.viewer-tools,.profile-strip,.channel-browser{display:none!important}.viewer{position:static;display:block;background:white;color:black}.chart-stage{padding:0}.single-chart,.split-card{break-inside:avoid;border-color:#bbb;background:white}.app,.toast{display:none!important} }
+    @media(max-width:800px){
+      :root{--nav:0px}.app{display:block}.sidebar{display:none}.main{grid-column:auto;padding:0 14px calc(82px + env(safe-area-inset-bottom))}.topbar{height:61px;margin-inline:-14px;padding-inline:14px}.dataset-bar{grid-template-columns:minmax(0,1fr) auto}.dataset-copy{min-width:0}.dataset-select{grid-column:1/-1;grid-row:2}.section-head{align-items:stretch;flex-direction:column;gap:12px}.section-head .toolbar{width:100%;margin-left:0;justify-content:flex-start}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.overview{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-card:last-child{grid-column:1/-1}.settings-grid{grid-template-columns:1fr}.top-state span{max-width:130px;font-size:9px}.registration-status{padding:7px 8px;font-size:8px}.toast{left:50%;bottom:calc(76px + env(safe-area-inset-bottom))}.connection-notice{top:72px;left:50%;width:min(590px,calc(100% - 24px))}
+      .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:10px;right:10px;bottom:max(8px,env(safe-area-inset-bottom));z-index:50;padding:7px;border:1px solid #263a52;border-radius:16px;background:#0a1220f2;box-shadow:0 14px 40px #0008;backdrop-filter:blur(18px)}.mobile-nav button{display:grid;place-items:center;gap:3px;border:0;border-radius:10px;padding:7px 3px;background:transparent;color:#71849b;font-size:8px;font-weight:800}.mobile-nav button b{display:grid;place-items:center;width:18px;height:18px;color:#72c4ff}.mobile-nav button.active{color:#bce4ff;background:#13263d}
+      .more-sheet{position:fixed;inset:auto 12px calc(76px + env(safe-area-inset-bottom));z-index:49;padding:10px;border:1px solid #2a405b;border-radius:15px;background:#0c1625f7;box-shadow:0 18px 50px #000a}.more-sheet.open{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.more-sheet button{display:flex;align-items:center;gap:8px;border:1px solid #24384f;border-radius:11px;padding:13px;background:#101d2d;color:#b4c5d7;text-align:left;font-size:11px;font-weight:800}
+      .upload-card{grid-template-columns:1fr}.image-overview{grid-template-columns:1fr}.screen-panel{grid-template-columns:110px minmax(0,1fr);gap:16px}.accessport-screen{transform:scale(.88);transform-origin:center}.editor-body{grid-template-columns:1fr}.editor-preview{min-height:310px}.editor-preview .accessport-screen{transform:scale(1.12)}.viewer-head{padding:8px 10px}.viewer-tools{padding:8px 10px}.profile-strip{padding:8px 10px}.chart-stage{padding:8px}.single-chart{height:58vh}.channel-browser{padding:9px 10px 18px}
+      .map-detail-grid{grid-template-columns:1fr}.map-detail-summary{display:grid}.compatibility{margin-left:0;width:max-content}
+      .health-head{align-items:flex-start;flex-direction:column}.health-controls{width:100%;margin-left:0}.health-controls label{flex:1}.health-controls .select{width:100%}.health-summary{grid-template-columns:repeat(3,1fr)}.health-primary{grid-column:1/-1}.health-layout{grid-template-columns:1fr}.health-canvas-wrap{height:270px}
+    }
+    @media(max-width:470px){
+      .main{padding-left:10px;padding-right:10px}.topbar{margin-inline:-10px;padding-inline:10px}.hero{padding:32px 2px 20px}.panel-inner{padding:16px}.device-layout{grid-template-columns:92px 1fr;gap:13px}.device-art{height:140px;border-radius:21px}.device-render-wrap{height:130px}.specs{gap:6px}.file{grid-template-columns:auto minmax(0,1fr) auto}.file-size{display:none}.row-buttons{grid-column:2/-1}.note-editor{grid-column:2/-1}.toolbar{width:100%;margin-left:0;justify-content:flex-start}.search{min-width:0;flex:1}.beta-card{grid-template-columns:1fr}.beta-orb{display:none}.connection-notice{grid-template-columns:auto minmax(0,1fr);align-items:start}.connection-actions{grid-column:1/-1;justify-content:flex-end}
+      #logActions span{flex:1 0 100%}#logActions .btn{flex:1;min-width:82px;padding-inline:8px}
+      .health-controls{display:grid;grid-template-columns:1fr}.health-summary{grid-template-columns:1fr 1fr}.health-primary{display:grid;grid-template-columns:76px 1fr}.health-score{width:76px;height:76px;flex-basis:76px}.health-summary .health-stat:last-child{grid-column:1/-1}.health-chart-panel,.health-detail{padding:14px}.health-chart-head{display:block}.health-legend{margin:8px 0 0}.health-canvas-wrap{height:240px}.investigation-card{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-wordmark" src="/assets/revlink-wordmark.png" alt="RevLink"></div>
+      <nav class="nav">
+        <button class="nav-button active" data-view="dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>Dashboard</button>
+        <button class="nav-button" data-view="datalogs"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5M8.5 14h2l1.2-2.5 2.1 5 1.2-2.5h2.5"/></svg></span>Datalogs</button>
+        <button class="nav-button" data-view="maps"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 6.5 5-2.5 7 2.5 5-2.5v14l-5 2.5-7-2.5-5 2.5Z"/><path d="M8.5 4v14m7-11.5v14"/></svg></span>Maps</button>
+        <button class="nav-button" data-view="images"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m5 17 4.5-4.5 3 3 2-2 4.5 3.5"/></svg></span>Images</button>
+        <button class="nav-button" data-view="device"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="4"/><rect x="9" y="5" width="6" height="8" rx="1"/><circle cx="12" cy="17.5" r="2"/></svg></span>Device</button>
+        <button class="nav-button" data-view="reports"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.8-2.8 8.3-7 10-4.2-1.7-7-5.2-7-10V6l7-3Z"/><path d="M7.2 12h2.1l1.3-3.1 2.5 6.2 1.4-3.1h2.3"/></svg></span>Vehicle Health<span class="nav-badge">BETA</span></button>
+        <button class="nav-button" data-view="settings"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6m4 0h6M4 12h10m4 0h2M4 18h3m4 0h9"/><circle cx="12" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg></span>Settings</button>
+      </nav>
+      <div class="side-foot"><strong id="sideDevice">RevLink Sidecar</strong><span id="sideHost">Local-first companion</span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><div id="pageKicker" class="page-kicker">AccessPort companion</div><div id="pageName" class="page-name">Dashboard</div></div>
+        <div class="top-state"><i class="dot"></i><span id="headerHostname">revlink.local</span></div>
+        <span id="registrationStatus" class="registration-status">Not registered</span>
+      </header>
+      <div class="content">
+        <section id="datasetBar" class="dataset-bar" hidden>
+          <div class="dataset-copy"><span>Viewing dataset</span><small id="datasetMeta">Choose a saved AccessPort</small></div>
+          <select id="datasetSelect" class="dataset-select" aria-label="Cached AccessPort dataset"></select>
+          <span id="datasetLive" class="dataset-live">Cached</span>
+        </section>
+        <section id="view-dashboard" class="view active">
+          <div class="hero"><div class="eyebrow">Your AccessPort. Your data.</div><h1>Ready when your car is.</h1><p id="heroCopy">Checking the bridge, storage, and attached device…</p></div>
+          <div class="grid">
+            <section class="panel"><div class="panel-inner" id="deviceCard"></div></section>
+            <section class="panel"><div class="panel-inner" id="syncCard"></div></section>
+            <section class="panel wide"><div class="panel-inner">
+              <div class="panel-head"><div><h2>Sidecar overview</h2><p>Attached hardware and selected local dataset</p></div><span class="badge good">On Sidecar</span></div>
+              <div class="overview">
+                <div class="overview-card"><span>Attached AccessPort</span><strong id="deviceState">Checking</strong><small id="deviceSub">USB discovery</small></div>
+                <div class="overview-card"><span>Known devices</span><strong id="knownDeviceCount">0</strong><small id="knownDeviceSub">Verified local datasets</small></div>
+                <div class="overview-card"><span>Selected dataset</span><strong id="fileCount">0 files</strong><small id="fileSub">No dataset selected</small></div>
+                <div class="overview-card"><span>Storage free</span><strong id="storageFree">—</strong><small id="storageSub">microSD</small></div>
+                <div class="overview-card"><span>Network</span><strong id="networkState">Local</strong><small id="hostname">revlink.local</small></div>
+              </div>
+            </div></section>
+            <section class="panel wide"><div class="panel-inner">
+              <div class="panel-head"><div><h2>Recent datalogs</h2><p>Open a log name to inspect its real values</p></div><button class="tab" data-view="datalogs">View all</button></div>
+              <div id="recentFiles" class="files"><div class="empty">No cached datalogs loaded yet.</div></div>
+            </div></section>
+          </div>
+        </section>
+
+        <section id="view-datalogs" class="view">
+          <div class="section-head"><p>Real values, first-sync chronology, local notes, direct CSV downloads, and native mail sharing.</p><div class="toolbar"><input id="logSearch" class="search" type="search" placeholder="Search datalogs"><select id="logSort" class="select"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">File name</option><option value="size">File size</option></select></div></div>
+          <p class="chronology">AccessPort datalog names can wrap from datalog58 to datalog1 and may be reused. Initial sync records when RevLink first cached that exact version, so it remains the reliable newest/oldest order.</p>
+          <div id="logActions" class="file-actions"><span id="logSelected">0 selected</span><button class="btn secondary" data-clear-selection>Clear</button><button id="downloadLogs" class="btn secondary">Download</button><button id="emailLogs" class="btn">Email selected</button></div>
+          <div class="panel"><div class="panel-inner"><div id="logFiles" class="files"><div class="empty">No datalogs loaded yet.</div></div></div></div>
+        </section>
+
+        <section id="view-maps" class="view">
+          <div class="section-head"><p>See exactly where each map is available. Sidecar copies remain accessible when the AccessPort is disconnected.</p><div class="toolbar"><input id="mapSearch" class="search" type="search" placeholder="Search maps"><select id="mapSort" class="select"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">File name</option><option value="size">File size</option></select></div></div>
+          <section id="mapUploadCard" class="panel upload-card" hidden>
+            <div><div class="eyebrow">Tuner workflow</div><h2>Transfer a map to this AccessPort</h2><p>RevLink refuses overwrites, pins this operation to the attached device, and reports success only after downloading the map again and matching its SHA-256.</p></div>
+            <div class="upload-form">
+              <input id="mapUploadFile" type="file" accept=".ptm">
+              <label class="map-destination"><span>AccessPort folder</span><div><strong>maps/</strong><input id="mapUploadName" type="text" maxlength="120" placeholder="My tuner map.ptm" autocomplete="off" spellcheck="false"></div><small>The folder is fixed for safety. You may rename only the map file.</small></label>
+              <div id="mapUploadStatus" class="upload-status">Choose one .ptm map to transfer.</div>
+              <div class="upload-buttons"><button id="applyMap" class="btn" disabled>Transfer to AccessPort</button></div>
+            </div>
+          </section>
+          <div id="mapActions" class="file-actions"><span id="mapSelected">0 selected</span><button class="btn secondary" data-clear-selection>Clear</button><button id="downloadMaps" class="btn">Download selected</button></div>
+          <div class="panel"><div class="panel-inner"><div id="mapFiles" class="files"><div class="empty">No maps loaded yet.</div></div></div></div>
+        </section>
+
+        <section id="view-images" class="view">
+          <div class="section-head"><p>Back up screenshots during every incremental sync and keep reusable startup-screen profiles in this AccessPort’s Sidecar dataset.</p><div class="toolbar"><button id="addStartupProfile" class="btn">Add startup image</button></div></div>
+          <div class="image-overview">
+            <section class="panel"><div class="panel-inner screen-panel">
+              <div class="accessport-screen"><canvas id="currentStartupCanvas" width="240" height="320"></canvas></div>
+              <div class="screen-copy"><div class="eyebrow">Selected AccessPort</div><h2>Current startup screen</h2><p id="currentStartupCopy">Sync this AccessPort to cache its current startup screen.</p><div class="screen-specs"><span>240 × 320</span><span>RGB565</span><span>150 KiB</span></div></div>
+            </div></section>
+            <section class="panel"><div class="panel-inner">
+              <div class="panel-head"><div><h2>Startup image library</h2><p>Saved on the Sidecar for this AccessPort only</p></div><span class="badge good">One-tap switch</span></div>
+              <div id="startupProfiles" class="image-library"><div class="empty image-empty">No reusable startup images yet.</div></div>
+            </div></section>
+          </div>
+          <section class="panel image-section"><div class="panel-inner">
+            <div class="panel-head"><div><h2>AccessPort screenshots</h2><p>Backed up during sync. Any screenshot can become a reusable startup profile.</p></div><span class="badge">On Sidecar</span></div>
+            <div id="screenshotLibrary" class="screenshot-library"><div class="empty image-empty">No cached screenshots for this AccessPort.</div></div>
+          </div></section>
+        </section>
+
+        <section id="view-device" class="view">
+          <div class="section-head"><p>Identity, USB state, and incremental synchronization controls.</p></div>
+          <div class="grid"><section class="panel"><div class="panel-inner" id="deviceCardFull"></div></section><section class="panel"><div class="panel-inner" id="syncCardFull"></div></section></div>
+        </section>
+
+        <section id="view-reports" class="view">
+          <div class="health-head">
+            <div><span class="badge warn" style="display:inline-block;margin:0">Beta</span><h1>Vehicle Health</h1><p>A deterministic trend built from immutable cached datalogs. RevLink highlights evidence and changing patterns; it does not guess which part to replace.</p></div>
+            <div class="health-controls"><label>Analysis window<select id="healthWindow" class="select"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></label><button id="runHealth" class="btn">Analyze latest logs</button></div>
+          </div>
+          <div class="health-summary">
+            <section class="panel health-primary"><div id="healthScoreRing" class="health-score"><div><strong id="healthScore">—</strong><small>HEALTH</small></div></div><div><div class="eyebrow">Latest evidence</div><h2 id="healthHeadline">Ready to analyze</h2><p id="healthSummaryCopy">Choose how many recent logs to review. Missing channels reduce confidence rather than lowering the health score.</p></div></section>
+            <section class="panel health-stat"><span>Confidence</span><strong id="healthConfidence">—</strong><small id="healthConfidenceCopy">Channel and condition coverage</small></section>
+            <section class="panel health-stat"><span>Evidence</span><strong id="healthEvidence">—</strong><small id="healthEvidenceCopy">No logs analyzed</small></section>
+            <section class="panel health-stat"><span>Map context</span><strong id="healthMaps">—</strong><small id="healthMapsCopy">Exact hash or declared map name</small></section>
+          </div>
+          <div class="health-layout">
+            <section class="panel health-chart-panel"><div class="health-chart-head"><div><h2>Health over time</h2><p>Scrub each point to inspect the log, active map context, and evidence.</p></div><div class="health-legend"><span><i style="background:#5ee59b"></i>Stable</span><span><i style="background:#ffcc68"></i>Review</span><span><i style="background:#ff7889"></i>Attention</span></div></div><div id="healthCanvasWrap" class="health-canvas-wrap"><div class="health-empty">Run an analysis to build the timeline.</div></div><input id="healthScrub" class="health-scrub" type="range" min="0" max="0" value="0" disabled aria-label="Selected health timeline point"></section>
+            <section class="panel health-detail"><div class="eyebrow">Selected evidence</div><h2 id="healthPointTitle">No point selected</h2><p id="healthPointCopy">The latest analyzed log will appear here.</p><div id="healthPointMeta" class="health-point-meta"></div><div class="health-map"><span>Map context</span><strong id="healthPointMap">Not analyzed</strong></div><div id="healthSignals" class="health-signals"></div><div class="health-footer"><button id="healthOpenLog" class="btn secondary" disabled>Open datalog</button><button id="healthTagMap" class="btn secondary" data-view="datalogs">Tag map</button></div><div id="healthVersion" class="health-version">vehicle-health-engine v1</div></section>
+          </div>
+          <section class="panel investigation-card"><div><div class="eyebrow">Focused workflow</div><h2>Investigations</h2><p>Symptom-led diagnostic cases remain a separate workflow for trouble codes, observations, selected evidence, and verification plans. AI assistance will be optional and added later.</p></div><span class="badge warn">Coming later</span></section>
+        </section>
+
+        <section id="view-settings" class="view">
+          <div class="section-head"><p>Configure automatic backups before the next AccessPort is attached.</p></div>
+          <div class="settings-grid">
+            <section class="setting-card"><div class="label">Sidecar identity</div><h3>Unique device identifier</h3><p>This permanent internal ID identifies this Sidecar independently of its hostname, Wi-Fi MAC address, or connected AccessPort.</p><code id="settingsDeviceId" class="device-identifier">Loading…</code></section>
+            <section class="setting-card"><div class="label">Synchronization</div><h3>Automatic datalog backup</h3><p>Start a verified incremental sync whenever an AccessPort is physically attached.</p><label class="policy"><span class="switch"><input id="autoSyncSettings" type="checkbox"><i></i></span><span id="autoSyncCopy">Disabled</span></label></section>
+            <section class="setting-card"><div class="label">Network</div><h3 id="settingsNetwork">RevLink Direct</h3><p id="settingsHost">Use the local hostname from any browser on the same connection.</p><a class="btn secondary" style="display:inline-block;text-decoration:none" href="/setup">Manage connection</a></section>
+            <section class="setting-card"><div class="label">Storage safety</div><h3 id="writeSafetyTitle"><span class="lock">Locked</span> by firmware</h3><p id="writeSafetyCopy">Device writes and deletes are not compiled into this build. Viewing, notes, downloads, and synchronization are read-only.</p><label id="writeConsentPolicy" class="policy" hidden><span class="switch"><input id="writeConsent" type="checkbox"><i></i></span><span id="writeConsentCopy">Device writes locked</span></label></section>
+            <section class="setting-card"><div class="label">Data portability</div><h3>Backup &amp; restore</h3><p>Download every cached device dataset, map, datalog, screenshot, startup profile, and note. Sidecar identity and Wi-Fi credentials are never included.</p><input id="backupRestoreFile" type="file" accept=".revlink-backup,application/x-revlink-backup" hidden><div class="backup-actions"><button id="downloadBackup" class="btn secondary" type="button">Download backup</button><button id="chooseRestore" class="btn secondary" type="button">Choose backup</button><button id="applyRestore" class="btn" type="button" hidden>Restore missing data</button></div><div id="backupStatus" class="backup-status">Disconnect the AccessPort before backing up or restoring.</div></section>
+            <section class="setting-card"><div class="label">Cloud sync</div><h3>Optional cloud backup</h3><p>Encrypted account sync and share links are planned for a later release. Local use will remain fully supported.</p><span class="badge warn" style="display:inline-block;margin:16px 0 0">Coming later</span></section>
+          </div>
+        </section>
+      </div>
+      <footer class="build-footer" aria-label="Firmware build information">
+        <span id="buildVersion">Firmware build loading…</span>
+        <span id="buildTimestamp">Compile time loading…</span>
+      </footer>
+    </main>
+  </div>
+
+  <nav class="mobile-nav">
+    <button class="active" data-view="dashboard"><b class="mobile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></b>Home</button>
+    <button data-view="datalogs"><b class="mobile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5M8.5 14h2l1.2-2.5 2.1 5 1.2-2.5h2.5"/></svg></b>Logs</button>
+    <button data-view="maps"><b class="mobile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 6.5 5-2.5 7 2.5 5-2.5v14l-5 2.5-7-2.5-5 2.5Z"/><path d="M8.5 4v14m7-11.5v14"/></svg></b>Maps</button>
+    <button data-view="device"><b class="mobile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="4"/><rect x="9" y="5" width="6" height="8" rx="1"/><circle cx="12" cy="17.5" r="2"/></svg></b>Device</button>
+    <button id="moreButton"><b class="mobile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></b>More</button>
+  </nav>
+  <div id="moreSheet" class="more-sheet"><button data-view="images"><span class="sheet-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m5 17 4.5-4.5 3 3 2-2 4.5 3.5"/></svg></span>Images</button><button data-view="reports"><span class="sheet-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.8-2.8 8.3-7 10-4.2-1.7-7-5.2-7-10V6l7-3Z"/><path d="M7.2 12h2.1l1.3-3.1 2.5 6.2 1.4-3.1h2.3"/></svg></span>Vehicle Health · Beta</button><button data-view="settings"><span class="sheet-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6m4 0h6M4 12h10m4 0h2M4 18h3m4 0h9"/><circle cx="12" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg></span>Settings</button><button onclick="location.href='/setup'"><span class="sheet-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5a11 11 0 0 1 15 0M7.5 13a6.5 6.5 0 0 1 9 0M10.5 16.5a2.3 2.3 0 0 1 3 0"/><circle cx="12" cy="20" r=".8" fill="currentColor" stroke="none"/></svg></span>Connection setup</button><button id="closeMore"><span class="sheet-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></span>Close</button></div>
+
+  <section id="viewer" class="viewer" aria-modal="true" role="dialog">
+    <header class="viewer-head">
+      <button id="closeViewer" class="close" aria-label="Close viewer">×</button>
+      <div class="viewer-title"><b id="viewerName">Datalog</b><span id="viewerMeta">Loading cached CSV…</span></div>
+      <div class="viewer-modes"><button class="tab active" data-mode="single">Single</button><button class="tab" data-mode="split">Split</button></div>
+    </header>
+    <div class="viewer-tools">
+      <input id="channelSearch" class="search" type="search" placeholder="Search channels">
+      <select id="axisMode" class="select"><option value="shared">Y-axis: Shared values</option><option value="channel">Y-axis: Per channel</option></select>
+      <select id="profileSelect" class="select" aria-label="Channel profile"></select>
+      <button id="saveProfile" class="btn secondary">Save profile</button>
+      <button id="viewerDownload" class="btn secondary">Download CSV</button>
+      <button id="viewerPrint" class="btn secondary">Print / PDF</button>
+    </div>
+    <div id="presetStrip" class="profile-strip"></div>
+    <div id="viewerLoading" class="viewer-loading">Reading the verified local cache…</div>
+    <div id="chartStage" class="chart-stage" hidden><div id="singleChart" class="single-chart"><canvas></canvas></div><div id="splitGrid" class="split-grid" hidden></div></div>
+    <div id="channelBrowser" class="channel-browser" hidden><div id="channelChips" class="channel-chips"></div></div>
+  </section>
+  <dialog id="startupEditor" class="image-editor">
+    <header class="editor-head"><div><h2>Create startup image profile</h2><p>Crop and preview the exact 240 × 320 AccessPort framebuffer.</p></div><button id="closeStartupEditor" class="close" type="button" aria-label="Close">×</button></header>
+    <div class="editor-body">
+      <div class="editor-preview"><div class="accessport-screen"><canvas id="startupCropCanvas" width="240" height="320"></canvas></div></div>
+      <div class="editor-controls">
+        <label>Source image<input id="startupImageFile" type="file" accept="image/*"></label>
+        <label>Profile name<input id="startupProfileName" type="text" maxlength="80" placeholder="Track day blue"></label>
+        <label>Zoom<input id="startupZoom" type="range" min="100" max="250" value="100"></label>
+        <label>Horizontal position<input id="startupPositionX" type="range" min="-100" max="100" value="0"></label>
+        <label>Vertical position<input id="startupPositionY" type="range" min="-100" max="100" value="0"></label>
+        <div class="editor-note">The profile is stored in the selected AccessPort dataset. Saving it does not modify the AccessPort; use <strong>Set startup</strong> from the library when you are ready.</div>
+        <div class="editor-actions"><button id="cancelStartupEditor" class="btn secondary" type="button">Cancel</button><button id="saveStartupProfile" class="btn" type="button" disabled>Save profile</button></div>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="screenshotViewer" class="image-lightbox"><button id="closeScreenshotViewer" class="close" type="button" aria-label="Close">×</button><img id="screenshotViewerImage" alt="AccessPort screenshot"></dialog>
+  <dialog id="mapViewer" class="map-dialog">
+    <header class="editor-head"><div><h2>Map information</h2><p>Read from the locally cached map header. No AccessPort operation is performed.</p></div><button id="closeMapViewer" class="close" type="button" aria-label="Close">×</button></header>
+    <div id="mapDetailBody" class="map-detail-body">
+      <div class="map-detail-summary"><div><div class="eyebrow">Cached calibration</div><h2 id="mapDetailName">Reading map…</h2><p id="mapDetailDescription">Decrypting the public metadata header locally.</p></div><span id="mapCompatibility" class="compatibility unknown">Checking</span></div>
+      <div id="mapDetailGrid" class="map-detail-grid"></div>
+      <div><div class="eyebrow" style="margin-bottom:8px">Declared features</div><div id="mapFeatureList" class="map-feature-list"><span>Reading…</span></div></div>
+      <div id="mapDetailNote" class="map-detail-note">Compatibility is based only on the vehicle declaration in the map header. RevLink does not claim that a map is safe to flash.</div>
+      <div class="map-detail-actions"><button id="mapDetailDownload" class="btn secondary" type="button">Download map</button><button id="mapDetailClose" class="btn" type="button">Done</button></div>
+    </div>
+  </dialog>
+  <dialog id="downloadTray" class="map-dialog">
+    <header class="editor-head"><div><h2>Selected files ready</h2><p>RevLink requested every file separately. If your browser blocked one, download it here.</p></div><button id="closeDownloadTray" class="close" type="button" aria-label="Close">×</button></header>
+    <div class="map-detail-body">
+      <div id="downloadList" class="download-list"></div>
+      <div class="map-detail-actions"><button id="downloadTrayDone" class="btn" type="button">Done</button></div>
+    </div>
+  </dialog>
+  <div id="tooltip" class="tooltip"></div>
+  <div id="toast" class="toast"></div>
+  <section id="connectionNotice" class="connection-notice" aria-live="assertive" hidden>
+    <div class="connection-symbol">⌁</div>
+    <div class="connection-copy">
+      <strong id="connectionTitle">Connection to Sidecar lost</strong>
+      <p id="connectionMessage">RevLink will retry automatically.</p>
+      <small id="connectionProgress">Retry 1 of 5 in 10 seconds</small>
+    </div>
+    <div class="connection-actions">
+      <button id="retryConnection" class="btn secondary" type="button" hidden>Try again</button>
+      <button id="refreshConnection" class="btn" type="button" hidden>Refresh page</button>
+    </div>
+  </section>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const portalHeader = {'X-RevLink-Portal':'1'};
+    const COLORS = ['#65bfff','#7b6cff','#28d17f','#ff9d28','#ff6477','#28c9db','#c065ff','#e6c84c','#47ddbd','#ef72ad','#77a5ff','#b5dc55'];
+    const state = {status:null,files:[],devices:[],switchingDevice:false,view:'dashboard',selected:new Set(),viewer:null,viewerMode:'single',channels:[],axis:'shared',startupProfiles:[],startupProfilesLoaded:false,startupImage:null,startupImageUrl:null,imageUrls:[],imageRenderToken:0,devicePreviewToken:0,mapMetadata:new Map(),mapDetailFile:null,emailBusy:false,downloadFiles:[],backupPreview:null,backupBusy:false,backupNotice:null,health:{running:false,points:[],selected:0}};
+    let lastSync='',lastUpload='',lastFileTotal=null,toastTimer,resizeTimer;
+    const BACKGROUND_FAILURE_THRESHOLD = 3;
+    const RETRY_DELAYS = [10,15,20,25,30];
+    const connection = {offline:false,exhausted:false,attempt:0,remaining:0,timer:null,inFlight:false,statusLoading:false,failureCount:0};
+    const PAGE = {
+      dashboard:['AccessPort companion','Dashboard'],datalogs:['Verified local cache','Datalogs'],
+      maps:['Calibrations','Maps'],images:['Device personalization','Images'],device:['Connected hardware','Device'],
+      reports:['Evidence trends','Vehicle Health · Beta'],settings:['Sidecar preferences','Settings']
+    };
+    const DATASET_VIEWS = new Set(['dashboard','datalogs','maps','images','reports']);
+    const PRESETS = [
+      {id:'fuel',name:'Air / Fuel',groups:[['RPM'],['AF Sens','AFR'],['AF Correction','AF Learning']]},
+      {id:'boost',name:'Boost control',groups:[['RPM'],['Boost','Man Abs'],['Wastegate','Throttle']]},
+      {id:'knock',name:'Knock & roughness',groups:[['Feedback Knock','Fine Knock'],['DAM','Dyn Adv'],['Roughness']]},
+      {id:'timing',name:'Timing',groups:[['RPM'],['Ignition Timing'],['Feedback Knock','Fine Knock']]},
+      {id:'thermal',name:'Thermal health',groups:[['Coolant Temp'],['Intake Temp','Manifold'],['Battery Volts']]},
+    ];
+    function text(id,value){ const node=$(id); if(node) node.textContent=value }
+    function filename(path){const parts=(path||'').split('/');return parts.at(-1)||path||'File'}
+    function bytes(value){if(!Number.isFinite(value)||value<0)return'—';const u=['B','KB','MB','GB','TB'];let n=value,i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return`${n>=10||i===0?n.toFixed(0):n.toFixed(1)} ${u[i]}`}
+    function storageGib(value){if(!Number.isFinite(value)||value<0)return'—';return`${(value/(1024**3)).toFixed(1)} GiB`}
+    function storageCard(value){if(!Number.isFinite(value)||value<=0)return'microSD';return`${storageGib(value)} usable · ${Math.round(value/1e9)} GB card`}
+    function human(value){return(value||'unknown').split(/[-_]/).map(x=>x?x[0].toUpperCase()+x.slice(1):'').join(' ')}
+    function syncFailureDetail(sync,device){
+      if(sync.dataPhaseCompleted&&!sync.sessionCloseAcknowledged){
+        return device.available
+          ?'Backup verified. The AccessPort connection has recovered.'
+          :'Backup verified. Restoring the AccessPort connection automatically…'
+      }
+      if(!device.attached)return'Reconnect the AccessPort, then try the sync again.';
+      return'Synchronization stopped before verification completed. Try again; existing Sidecar files remain safe.'
+    }
+    function badge(node,label,kind=''){node.textContent=label;node.className=`badge ${kind}`.trim()}
+    function toast(message){clearTimeout(toastTimer);text('toast',message);$('toast').classList.add('show');toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3000)}
+    function sidecarUnavailable(error){return Boolean(error?.sidecarUnavailable)}
+    async function jsonRequest(path,options={}){
+      const {timeoutMs=8000,...requestOptions}=options,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);
+      let response;
+      try{response=await fetch(path,{cache:'no-store',...requestOptions,signal:controller.signal})}
+      catch(error){const failure=new Error('Sidecar connection is unavailable');failure.sidecarUnavailable=true;failure.cause=error;throw failure}
+      finally{clearTimeout(timeout)}
+      connection.failureCount=0;
+      let data={};try{data=await response.json()}catch{}
+      if(!response.ok)throw new Error(data.error||data.status||'Request failed');
+      return data
+    }
+    function setConnectionIndicator(kind){
+      const dot=document.querySelector('.top-state .dot');dot.classList.toggle('warn',kind==='retrying');dot.classList.toggle('bad',kind==='offline')
+    }
+    function stopRetryTimer(){clearTimeout(connection.timer);connection.timer=null}
+    function showRetryNotice(){
+      const attempt=connection.attempt+1;
+      $('connectionNotice').hidden=false;$('connectionNotice').classList.remove('final');
+      text('connectionTitle','Connection to Sidecar lost');
+      text('connectionMessage','The page is still available. RevLink will retry automatically.');
+      text('connectionProgress',`Retry ${attempt} of ${RETRY_DELAYS.length} in ${connection.remaining} second${connection.remaining===1?'':'s'}`);
+      $('retryConnection').hidden=true;$('refreshConnection').hidden=true;
+      setConnectionIndicator('retrying')
+    }
+    function showOfflineNotice(){
+      stopRetryTimer();connection.exhausted=true;$('connectionNotice').hidden=false;$('connectionNotice').classList.add('final');
+      text('connectionTitle','Sidecar appears to be offline');
+      text('connectionMessage','Check that the Sidecar has power and that this device is connected to the same Wi-Fi or RevLink Direct network.');
+      text('connectionProgress','Five reconnect attempts completed. Try again or refresh after the Sidecar is reachable.');
+      $('retryConnection').hidden=false;$('refreshConnection').hidden=false;
+      setConnectionIndicator('offline')
+    }
+    function scheduleRetry(){
+      stopRetryTimer();
+      if(connection.attempt>=RETRY_DELAYS.length){showOfflineNotice();return}
+      connection.remaining=RETRY_DELAYS[connection.attempt];showRetryNotice();
+      const tick=()=>{
+        if(!connection.offline||connection.exhausted)return;
+        connection.remaining-=1;
+        if(connection.remaining<=0){attemptReconnect();return}
+        showRetryNotice();connection.timer=setTimeout(tick,1000)
+      };
+      connection.timer=setTimeout(tick,1000)
+    }
+    function beginReconnect(){
+      if(connection.offline||connection.inFlight)return;
+      connection.offline=true;connection.exhausted=false;connection.attempt=0;connection.failureCount=0;scheduleRetry()
+    }
+    async function attemptReconnect({manual=false}={}){
+      if(connection.inFlight)return;
+      stopRetryTimer();connection.inFlight=true;
+      if(manual){connection.offline=true;connection.exhausted=false;connection.attempt=0}
+      $('connectionNotice').hidden=false;$('connectionNotice').classList.remove('final');
+      text('connectionTitle','Reconnecting to Sidecar');
+      text('connectionMessage','Checking the local connection now…');
+      text('connectionProgress',`Retry ${connection.attempt+1} of ${RETRY_DELAYS.length}`);
+      $('retryConnection').hidden=true;$('refreshConnection').hidden=true;
+      setConnectionIndicator('retrying');
+      try{
+        const data=await jsonRequest('/api/portal/status',{timeoutMs:5000});
+        connection.offline=false;connection.exhausted=false;connection.attempt=0;connection.failureCount=0;
+        $('connectionNotice').hidden=true;setConnectionIndicator('connected');
+        renderStatus(data);loadDevices();loadFiles();toast('Connection to Sidecar restored')
+      }catch(error){
+        if(!sidecarUnavailable(error)){connection.offline=false;$('connectionNotice').hidden=true;toast(error.message)}
+        else{connection.attempt+=1;connection.attempt>=RETRY_DELAYS.length?showOfflineNotice():scheduleRetry()}
+      }finally{connection.inFlight=false}
+    }
+    function connectionError(error,{background=false,count=true}={}){
+      if(sidecarUnavailable(error)){
+        if(background){
+          if(count)connection.failureCount+=1;
+          if(connection.failureCount>=BACKGROUND_FAILURE_THRESHOLD)beginReconnect();
+        }else beginReconnect();
+        return true
+      }
+      return false
+    }
+    function showView(name){
+      if(!PAGE[name])name='dashboard';state.view=name;
+      document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===`view-${name}`));
+      document.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===name));
+      text('pageKicker',PAGE[name][0]);text('pageName',PAGE[name][1]);$('moreSheet').classList.remove('open');
+      if(location.hash!==`#${name}`)history.replaceState(null,'',`#${name}`);
+      renderDeviceSelector();
+      if(name==='datalogs'||name==='maps')renderCollections();
+      if(name==='images')renderImages();
+      scrollTo({top:0,behavior:'instant'})
+    }
+    function deviceMarkup(){
+      return `<div class="panel-head"><div><h2>Selected AccessPort</h2><p>Identity and local dataset</p></div><span class="badge" data-device-badge>Checking</span></div>
+      <div class="device-layout"><div class="device-art"><div class="device-render-wrap"><img class="device-render" src="/assets/accessport-render.webp" alt="AccessPort"><canvas class="device-startup-preview" width="240" height="320" role="img" aria-label="Cached AccessPort startup screen" hidden></canvas></div></div><div><div class="vehicle" data-vehicle>AccessPort</div><div class="serial" data-serial>Choose a saved dataset</div><div class="specs"><div class="spec"><span>Part</span><strong data-part>—</strong></div><div class="spec"><span>Firmware</span><strong data-firmware>—</strong></div><div class="spec"><span>Family</span><strong data-family>—</strong></div><div class="spec"><span>Compatibility</span><strong data-support>—</strong></div><div class="spec"><span>Stored on</span><strong data-storage-location>Sidecar</strong></div><div class="spec"><span>Connection</span><strong data-selected-connection>Not attached</strong></div></div></div></div>`
+    }
+    function syncMarkup(){
+      return `<div class="panel-head"><div><h2>Synchronization</h2><p>Incremental, verified local cache</p></div><span class="badge" data-sync-badge>Idle</span></div>
+      <div class="sync-state"><strong data-sync-title>Ready</strong><span data-sync-detail>No transfer active</span></div><div class="progress" data-progress><i></i></div>
+      <div class="sync-metrics"><div class="metric"><b data-downloaded>0</b><span>Downloaded</span></div><div class="metric"><b data-skipped>0</b><span>Verified</span></div><div class="metric"><b data-pending>0</b><span>Pending</span></div></div>
+      <div class="actions"><button class="btn" data-sync-button disabled>Sync AccessPort</button><button class="btn secondary" data-cancel-button disabled>Cancel</button></div>
+      <label class="policy"><span class="switch"><input type="checkbox" data-auto-sync><i></i></span>Automatically sync when attached</label>`
+    }
+    ['deviceCard','deviceCardFull'].forEach(id=>$(id).innerHTML=deviceMarkup());
+    ['syncCard','syncCardFull'].forEach(id=>$(id).innerHTML=syncMarkup());
+    function renderStatus(data){
+      state.status=data;const{device,accessPort,sync,storage,network,identity,safety}=data,attachedAccessPort=data.attachedAccessPort||{known:false};
+      const build=data.build||{};
+      text('buildVersion',`Firmware ${build.version||'unknown'}`);
+      text('buildTimestamp',build.date&&build.time?`Built ${build.date} · ${build.time}`:'Compile time unavailable');
+      const attached=device.attached,ready=device.available,active=sync.active,conflict=device.state==='multiple-devices';
+      const selectedKnown=Boolean(accessPort?.known),selectedIsAttached=Boolean(selectedKnown&&attachedAccessPort.known&&accessPort.serial===attachedAccessPort.serial);
+      const catalogSupported=!attachedAccessPort.known||attachedAccessPort.catalogSupported!==false;
+      const wifiConnected=network.state==='client-ready',networkName=wifiConnected?(network.ssid||'Preferred Wi-Fi'):(identity.ssid||'RevLink Direct');
+      const registration=data.cloud?.registration||'unregistered',registrationNode=$('registrationStatus');
+      text('headerHostname',`${identity.hostname}.local`);text('registrationStatus',registration==='registered'?'Registered':registration==='pending'?'Registration pending':'Not registered');registrationNode.classList.toggle('registered',registration==='registered');registrationNode.classList.toggle('pending',registration==='pending');
+      text('networkState',wifiConnected?'Wi-Fi':'Direct');
+      text('hostname',`${identity.hostname}.local`);text('sideDevice',wifiConnected?'Wi-Fi connected':'RevLink Direct');text('sideHost',networkName);text('settingsDeviceId',identity.deviceId||'Unavailable');
+      const selectedName=selectedKnown?(accessPort.vehicle||accessPort.partNumber||'AccessPort'):'AccessPort';
+      const selectedModel=selectedKnown?(accessPort.partNumber||'AccessPort'):'AccessPort';
+      const selectedDescriptor=selectedKnown?[accessPort.vehicle,accessPort.serial].filter(Boolean).join(' · '):'No cached AccessPort selected';
+      text('heroCopy',conflict?'Multiple AccessPorts detected. Unplug all of them, then reconnect only the one you want to use.':selectedKnown&&!selectedIsAttached?`Reviewing the cached dataset for ${selectedName}. ${attachedAccessPort.known?`${attachedAccessPort.partNumber||'Another AccessPort'} is attached; select its dataset before syncing or transferring files.`:'Attach this AccessPort when you are ready to sync or transfer files.'}`:attachedAccessPort.known&&!catalogSupported?'This AccessPort was identified, but its exact part number is not in the reviewed compatibility catalog. File operations are safely blocked.':ready&&attachedAccessPort.known?'This selected AccessPort is connected and ready for a verified incremental sync.':ready?'AccessPort detected. RevLink is reading its identity.':attached?'AccessPort detected. RevLink is preparing the USB connection.':'Select a cached AccessPort to review its data, or attach one to begin a verified backup.');
+      document.querySelectorAll('[data-device-badge]').forEach(node=>badge(node,conflict?'Conflict':selectedIsAttached?'Connected now':selectedKnown?'Cached dataset':'No dataset',conflict?'bad':selectedIsAttached?'good':selectedKnown?'':'warn'));
+      document.querySelectorAll('[data-vehicle]').forEach(node=>node.textContent=selectedModel);
+      document.querySelectorAll('[data-serial]').forEach(node=>node.textContent=conflict?'Unplug all AccessPorts, then reconnect one':selectedDescriptor);
+      document.querySelectorAll('[data-part]').forEach(node=>node.textContent=accessPort.partNumber||'—');document.querySelectorAll('[data-firmware]').forEach(node=>node.textContent=accessPort.firmware||'—');
+      document.querySelectorAll('[data-family]').forEach(node=>node.textContent=accessPort.familyName||'—');document.querySelectorAll('[data-support]').forEach(node=>node.textContent=selectedKnown?(accessPort.catalogSupported===false?'Review required':'Supported'):'—');
+      document.querySelectorAll('[data-storage-location]').forEach(node=>node.textContent=selectedKnown?'Sidecar cache':'—');document.querySelectorAll('[data-selected-connection]').forEach(node=>node.textContent=selectedIsAttached?'Connected now':'Not attached');
+      text('deviceState',conflict?'Conflict':attachedAccessPort.known?(attachedAccessPort.partNumber||'Connected'):(ready?'Identifying':human(device.state)));text('deviceSub',conflict?`${device.eligibleCount||2} AccessPorts detected`:attachedAccessPort.known?`${attachedAccessPort.vehicle||'AccessPort'} · ${attachedAccessPort.serial}`:device.highSpeed?'Reading USB identity':'No AccessPort attached');
+      const completed=sync.downloaded+sync.skipped,percent=sync.candidates?Math.min(100,Math.round(completed*100/sync.candidates)):0,fullySynced=sync.state==='completed'&&!sync.pending;
+      document.querySelectorAll('[data-progress]').forEach(node=>{node.classList.toggle('busy',active&&!sync.candidates);node.querySelector('i').style.width=active&&!sync.candidates?'':`${percent}%`});
+      document.querySelectorAll('[data-downloaded]').forEach(node=>node.textContent=sync.downloaded);document.querySelectorAll('[data-skipped]').forEach(node=>node.textContent=sync.skipped);document.querySelectorAll('[data-pending]').forEach(node=>node.textContent=sync.pending);
+      document.querySelectorAll('[data-sync-badge]').forEach(node=>badge(node,sync.state==='completed'&&sync.pending?'More files':human(sync.state),fullySynced?'good':sync.state==='failed'?'bad':active||sync.pending?'warn':''));
+      const backupVerifiedAfterCloseFailure=sync.state==='failed'&&sync.dataPhaseCompleted&&!sync.sessionCloseAcknowledged;
+      document.querySelectorAll('[data-sync-title]').forEach(node=>node.textContent=conflict?'Blocked':selectedKnown&&!selectedIsAttached?'Cached only':active?`${percent}% complete`:fullySynced?'Up to date':sync.state==='completed'&&sync.pending?'Finishing backup':backupVerifiedAfterCloseFailure?(device.available?'Backup complete':'Reconnecting') :sync.state==='failed'?'Needs attention':'Ready');
+      document.querySelectorAll('[data-sync-detail]').forEach(node=>node.textContent=conflict?'Multiple AccessPorts are connected':selectedKnown&&!selectedIsAttached?'Attach this AccessPort to update its dataset':active?`${completed} of ${sync.candidates||'…'} checked`:fullySynced?`${completed} files verified`:sync.state==='completed'&&sync.pending?`${sync.pending} files remain; continuation will start automatically`:sync.state==='failed'?syncFailureDetail(sync,device):'No transfer active');
+      document.querySelectorAll('[data-sync-button]').forEach(node=>{node.disabled=conflict||!catalogSupported||!ready||!selectedIsAttached||!storage.mounted||active||safety.shutdownRequested;node.textContent=selectedKnown&&!selectedIsAttached?'Attach selected AccessPort':'Sync AccessPort'});document.querySelectorAll('[data-cancel-button]').forEach(node=>node.disabled=!active);
+      document.querySelectorAll('[data-auto-sync]').forEach(node=>{node.checked=sync.autoSync;node.disabled=conflict||active||safety.shutdownRequested});
+      $('autoSyncSettings').checked=sync.autoSync;$('autoSyncSettings').disabled=conflict||active||safety.shutdownRequested;text('autoSyncCopy',conflict?'Blocked until only one AccessPort is reattached':sync.autoSync?'Enabled — sync on attach':'Disabled');
+      text('fileCount',`${storage.totalFiles} file${storage.totalFiles===1?'':'s'}`);text('fileSub',accessPort.known?(accessPort.partNumber||accessPort.serial||'Selected dataset'):'No dataset selected');text('storageFree',storage.mounted?storageGib(storage.freeBytes):'Offline');text('storageSub',storageCard(storage.totalBytes));
+      text('settingsNetwork',network.state==='client-ready'?'Connected through Wi-Fi':'RevLink Direct');text('settingsHost',network.state==='client-ready'&&network.credentialsPersistent?`Saved for automatic reconnect · Open http://${identity.hostname}.local from a device on the same network.`:`Open http://${identity.hostname}.local from a device on the same connection.`);
+      const upload=data.mapUpload||{state:'idle',kind:'map',staged:false,name:'',destination:'',size:0,platformError:0},mapOperation=upload.kind!=='startup';
+      $('mapUploadCard').hidden=!safety.writesCompiled;$('writeConsentPolicy').hidden=!safety.writesCompiled;
+      text('writeSafetyTitle',safety.writesCompiled?(safety.writeConsent?'Device writes enabled':'Device writes locked'):'Locked by firmware');
+      text('writeSafetyCopy',safety.writesCompiled?'Uploads are guarded by exact device identity, destination allowlists, protocol acknowledgements, and byte-identical read-back. Deletes remain unavailable.':'Device writes and deletes are not compiled into this build. Viewing, notes, downloads, and synchronization are read-only.');
+      $('writeConsent').checked=Boolean(safety.writeConsent);$('writeConsent').disabled=upload.state==='running'||safety.writeRecoveryRequired;text('writeConsentCopy',safety.writeRecoveryRequired?'Reconnect the AccessPort before another write':safety.writeConsent?'Enabled until you turn it off':'Device writes locked');
+      const backupBlocked=!storage.mounted||storage.sessionSelected||active||state.backupBusy;$('downloadBackup').disabled=backupBlocked;$('chooseRestore').disabled=backupBlocked;
+      if(state.backupNotice){text('backupStatus',state.backupNotice.message);$('backupStatus').className=`backup-status ${state.backupNotice.kind}`}
+      else if(!state.backupPreview){text('backupStatus',!storage.mounted?'Insert a healthy microSD card to use backup and restore.':storage.sessionSelected||active?'Disconnect the AccessPort and wait for synchronization to finish.':'Ready. Restore only adds missing files; existing data is never overwritten.');$('backupStatus').className='backup-status'}
+      text('mapUploadStatus',!mapOperation?'A startup-screen transfer is using the write service.':safety.writeRecoveryRequired?'Recovery required: fully unplug the AccessPort before another write.':upload.state==='running'?`Transferring ${upload.destination||upload.name} and verifying read-back…`:upload.state==='verified'?`${upload.destination} was transferred and verified byte-for-byte.`:upload.state==='failed'?mapTransferFailure(upload.platformError):upload.staged?`${upload.name} prepared · ${bytes(upload.size)} · ready to transfer`:'Choose one .ptm map to transfer.');
+      updateMapTransferButton();
+      const uploadKey=`${upload.kind}:${upload.state}`;if(lastUpload&&lastUpload!==uploadKey&&upload.state==='verified'){toast(upload.kind==='startup'?'Startup screen transferred and verified':'Map transferred and verified byte-for-byte');loadFiles()}else if(lastUpload&&lastUpload!==uploadKey&&upload.state==='failed')toast(`${upload.kind==='startup'?'Startup screen':'Map'} transfer failed; no automatic retry was attempted`);lastUpload=uploadKey;
+      const completedNow=lastSync&&lastSync!==sync.state&&fullySynced,inventoryChanged=lastFileTotal!==null&&lastFileTotal!==storage.totalFiles;
+      if(completedNow||inventoryChanged){
+        loadDevices();loadFiles();
+        if(completedNow){
+          state.startupProfilesLoaded=false;
+          loadStartupProfiles({render:state.view==='images'});
+          toast('Synchronization complete')
+        }
+      }
+      lastSync=sync.state;lastFileTotal=storage.totalFiles;
+      renderDeviceSelector();updateStartupButtons()
+    }
+    async function loadStatus(){
+      if(document.hidden||connection.offline||connection.statusLoading)return;
+      connection.statusLoading=true;
+      try{renderStatus(await jsonRequest('/api/portal/status',{timeoutMs:5000}))}
+      catch(error){if(!connectionError(error,{background:true}))toast(error.message)}
+      finally{connection.statusLoading=false}
+    }
+    function compareFiles(sort){return(a,b)=>{if(sort==='name')return filename(a.path).localeCompare(filename(b.path),undefined,{numeric:true,sensitivity:'base'});if(sort==='size')return(b.size||0)-(a.size||0)||filename(a.path).localeCompare(filename(b.path),undefined,{numeric:true});const at=Number(a.initialSyncUtc)||0,bt=Number(b.initialSyncUtc)||0;return(sort==='oldest'?at-bt:bt-at)||filename(a.path).localeCompare(filename(b.path),undefined,{numeric:true})}}
+    async function loadFiles(){
+      if(connection.offline)return;
+      try{const data=await jsonRequest('/api/portal/files');state.files=data.files||[];renderCollections();renderDeviceStartupPreviews();if(state.view==='images')renderImages()}
+      catch(error){if(!connectionError(error,{background:true,count:false}))toast(error.message)}
+    }
+    function renderDeviceSelector(){
+      const bar=$('datasetBar'),select=$('datasetSelect'),selected=state.devices.find(device=>device.selected),attached=state.status?.attachedAccessPort;
+      const knownCount=state.devices.length;
+      text('knownDeviceCount',knownCount);text('knownDeviceSub',knownCount===1?'1 verified local dataset':`${knownCount} verified local datasets`);
+      bar.hidden=!state.devices.length||!DATASET_VIEWS.has(state.view);
+      select.textContent='';
+      state.devices.forEach(device=>{const option=document.createElement('option');option.value=device.key;option.selected=device.selected;option.textContent=`${device.vehicle||device.partNumber||'AccessPort'} · ${device.partNumber||'Device'} · ${device.serial}${device.catalogSupported===false?' · Review required':''}`;select.append(option)});
+      select.disabled=state.switchingDevice||Boolean(state.status?.sync?.active)||state.devices.length<2;
+      text('datasetMeta',knownCount===1?'1 verified local dataset':`${knownCount} verified local datasets`);
+      const live=Boolean(selected&&attached?.known&&selected.serial===attached.serial);
+      text('datasetLive',live?'Connected now':'Cached dataset');$('datasetLive').classList.toggle('good',live)
+    }
+    async function loadDevices(){
+      if(connection.offline)return;
+      try{const data=await jsonRequest('/api/portal/devices');state.devices=data.devices||[];renderDeviceSelector()}
+      catch(error){if(!connectionError(error,{background:true,count:false}))toast(error.message)}
+    }
+    async function selectCachedDevice(key){
+      const current=state.devices.find(device=>device.selected);if(!key||current?.key===key)return;
+      state.switchingDevice=true;renderDeviceSelector();
+      try{
+        await jsonRequest('/api/portal/device/select',{method:'POST',headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({key})});
+        state.selected.clear();if(state.viewer)closeViewer();closeMapDetails();state.startupProfiles=[];state.startupProfilesLoaded=false;state.health={running:false,points:[],selected:0};renderVehicleHealth();
+        await Promise.all([loadStatus(),loadFiles(),loadDevices(),loadStartupProfiles()]);toast('Cached device dataset selected')
+      }catch(error){toast(error.message);await loadDevices()}
+      finally{state.switchingDevice=false;renderDeviceSelector()}
+    }
+    function mapForDigest(digest){return digest?state.files.find(file=>file.kind==='map'&&file.sha256===digest):null}
+    function fileMetaText(file){const tagged=mapForDigest(file.mapDigest),parts=[file.kind==='map'?'Map':'Datalog'];if(file.note)parts.push('Note saved');if(file.kind==='datalog'&&file.mapDigest)parts.push(`Map: ${tagged?filename(tagged.path):'cached version unavailable'}`);parts.push(initialSync(file));return parts.join(' · ')}
+    function filtered(kind,search,sort){const query=(search||'').trim().toLowerCase();return state.files.filter(file=>{const tagged=mapForDigest(file.mapDigest);return file.kind===kind&&(!query||filename(file.path).toLowerCase().includes(query)||(file.note||'').toLowerCase().includes(query)||(tagged&&filename(tagged.path).toLowerCase().includes(query)))}).sort(compareFiles(sort))}
+    function initialSync(file){return file.initialSyncUtc?`Initial sync ${new Date(file.initialSyncUtc*1000).toLocaleString()}`:'Initial sync pending trusted time'}
+    function makeFileRow(file,{compact=false}={}){
+      const row=document.createElement('div');row.className='file';row.dataset.digest=file.sha256;
+      const check=document.createElement('input');check.type='checkbox';check.className='file-check';check.checked=state.selected.has(file.sha256);check.setAttribute('aria-label',`Select ${filename(file.path)}`);check.onchange=()=>{check.checked?state.selected.add(file.sha256):state.selected.delete(file.sha256);renderSelectionBars()};
+      if(compact)check.style.display='none';
+      const info=document.createElement('div'),name=document.createElement('button');name.type='button';name.className='file-name';name.textContent=filename(file.path);name.onclick=()=>file.kind==='datalog'?openViewer(file):openMapDetails(file);
+      const meta=document.createElement('span');meta.className='file-meta';meta.textContent=fileMetaText(file);
+      const locations=document.createElement('span');locations.className='file-locations';const sidecar=document.createElement('span');sidecar.className='location-badge';sidecar.textContent='Sidecar';locations.append(sidecar);
+      const selectedDevice=state.status?.accessPort,attachedDevice=state.status?.attachedAccessPort;if(selectedDevice?.known&&attachedDevice?.known&&selectedDevice.serial===attachedDevice.serial){const deviceLocation=document.createElement('span');deviceLocation.className='location-badge accessport';deviceLocation.textContent='AccessPort · last sync';locations.append(deviceLocation)}
+      if(file.cloudAvailable){const cloud=document.createElement('span');cloud.className='location-badge cloud';cloud.textContent='Cloud';locations.append(cloud)}
+      info.append(name,meta,locations);
+      const size=document.createElement('div');size.className='file-size';size.textContent=bytes(file.size);const date=document.createElement('small');date.textContent=file.initialSyncUtc?new Date(file.initialSyncUtc*1000).toLocaleDateString():'';size.append(date);
+      const buttons=document.createElement('div');buttons.className='row-buttons';const download=document.createElement('button');download.className='icon-btn';download.textContent=file.kind==='datalog'?'CSV':'Download';download.onclick=()=>downloadFile(file);const notes=document.createElement('button');notes.className=`note-button${file.note||file.mapDigest?' saved':''}`;notes.textContent=file.kind==='datalog'?(file.note||file.mapDigest?'Details':'Add details'):(file.note?'Notes':'Add note');buttons.append(download,notes);
+      const editor=document.createElement('div');editor.className='note-editor';
+      const textarea=document.createElement('textarea');textarea.maxLength=767;textarea.placeholder='Conditions, date or time, tuner instructions, or anything you want to remember…';textarea.value=file.note||'';editor.append(textarea);
+      let mapSelect=null;
+      if(file.kind==='datalog'){
+        const field=document.createElement('label');field.className='map-tag-field';field.textContent='Map used (optional)';
+        mapSelect=document.createElement('select');const none=document.createElement('option');none.value='';none.textContent='Not specified';mapSelect.append(none);
+        state.files.filter(candidate=>candidate.kind==='map').sort(compareFiles('name')).forEach(candidate=>{const option=document.createElement('option');option.value=candidate.sha256;option.textContent=filename(candidate.path);option.selected=candidate.sha256===file.mapDigest;mapSelect.append(option)});
+        if(file.mapDigest&&!mapForDigest(file.mapDigest)){const missing=document.createElement('option');missing.value=file.mapDigest;missing.textContent='Previously tagged map (not in this cache)';missing.selected=true;mapSelect.append(missing)}
+        field.append(mapSelect);editor.append(field)
+      }
+      const foot=document.createElement('div');foot.className='note-foot';const count=document.createElement('small'),cancel=document.createElement('button'),save=document.createElement('button');cancel.className='btn secondary';cancel.textContent='Cancel';save.className='btn';save.textContent=file.kind==='datalog'?'Save details':'Save note';
+      const update=()=>count.textContent=`${textarea.value.length} / 767`;textarea.oninput=update;update();
+      notes.onclick=()=>{editor.classList.toggle('open');if(editor.classList.contains('open'))textarea.focus()};
+      cancel.onclick=()=>{textarea.value=file.note||'';if(mapSelect)mapSelect.value=file.mapDigest||'';update();editor.classList.remove('open')};
+      save.onclick=async()=>{
+        save.disabled=true;const normalLabel=file.kind==='datalog'?'Save details':'Save note';save.textContent='Saving…';
+        try{
+          const pendingNote=textarea.value,pendingMap=mapSelect?.value||'';
+          if(pendingNote!==(file.note||''))await jsonRequest('/api/portal/notes',{method:'POST',headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({digest:file.sha256,note:pendingNote})});
+          if(mapSelect&&pendingMap!==(file.mapDigest||''))await jsonRequest('/api/portal/log-map',{method:'POST',headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({digest:file.sha256,mapDigest:pendingMap})});
+          file.note=pendingNote;if(mapSelect)file.mapDigest=pendingMap||null;
+          notes.textContent=file.kind==='datalog'?(file.note||file.mapDigest?'Details':'Add details'):(file.note?'Notes':'Add note');notes.classList.toggle('saved',Boolean(file.note||file.mapDigest));meta.textContent=fileMetaText(file);editor.classList.remove('open');toast(file.kind==='datalog'?'Log details saved locally':(file.note?'Note saved locally':'Note removed'))
+        }catch(error){toast(error.message);await loadFiles()}
+        finally{save.disabled=false;save.textContent=normalLabel}
+      };
+      foot.append(count,cancel,save);editor.append(foot);
+      row.append(check,info,size,buttons,editor);return row
+    }
+    function renderList(root,files,empty){root.textContent='';if(!files.length){const node=document.createElement('div');node.className='empty';node.textContent=empty;root.append(node);return}files.forEach(file=>root.append(makeFileRow(file)))}
+    function renderCollections(){
+      const logs=filtered('datalog',$('logSearch').value,$('logSort').value),maps=filtered('map',$('mapSearch').value,$('mapSort').value);
+      renderList($('logFiles'),logs,'No matching cached datalogs.');renderList($('mapFiles'),maps,'No matching cached maps.');
+      const recent=filtered('datalog',' ','newest').slice(0,4);$('recentFiles').textContent='';if(!recent.length)$('recentFiles').innerHTML='<div class="empty">No cached datalogs loaded yet.</div>';else recent.forEach(file=>$('recentFiles').append(makeFileRow(file,{compact:true})));
+      renderSelectionBars()
+    }
+    function selectedFor(kind){return state.files.filter(file=>file.kind===kind&&state.selected.has(file.sha256))}
+    function renderSelectionBars(){for(const kind of ['log','map']){const plural=kind==='log'?'datalog':'map',items=selectedFor(plural);$(`${kind}Actions`).classList.toggle('show',items.length>0);text(`${kind}Selected`,`${items.length} selected · ${kind==='log'?'email / download':'download'} limit 5`)}}
+    async function fetchFile(file){
+      let response;
+      try{response=await fetch(`/api/portal/file?digest=${encodeURIComponent(file.sha256)}`,{headers:portalHeader,cache:'no-store'})}
+      catch(error){const failure=new Error('Sidecar connection is unavailable');failure.sidecarUnavailable=true;failure.cause=error;throw failure}
+      connection.failureCount=0;
+      if(!response.ok){let message='Cached file is unavailable';try{message=(await response.json()).error||message}catch{}throw new Error(message)}return response
+    }
+    const PTM_XTEA_KEY=(()=>{const bytes=new TextEncoder().encode("7L-<g%_K*kYm'g[@"),view=new DataView(bytes.buffer);return[0,4,8,12].map(offset=>view.getUint32(offset,false))})();
+    function xteaMix(value,sum,key){return(((((value<<4)^(value>>>5))+value)>>>0)^((sum+key)>>>0))>>>0}
+    function xteaDecrypt(left,right){
+      let sum=0xc6ef3720;
+      for(let round=0;round<32;round++){right=(right-xteaMix(left,sum,PTM_XTEA_KEY[(sum>>>11)&3]))>>>0;sum=(sum-0x9e3779b9)>>>0;left=(left-xteaMix(right,sum,PTM_XTEA_KEY[sum&3]))>>>0}
+      return[left,right]
+    }
+    function directText(root,name){const node=Array.from(root.children).find(child=>child.tagName===name);return node?.textContent?.trim()||null}
+    function decodeMapMetadata(buffer){
+      const bytes=new Uint8Array(buffer);if(bytes.length<13)throw new Error('File is too small to contain a map header');
+      const trailer=new DataView(buffer),nonce=trailer.getUint32(bytes.length-4,false),cipherLength=bytes.length-4,pad=bytes[cipherLength-1];if(pad>8)throw new Error('Map header is encrypted with an unsupported format');
+      const blocks=Math.min(Math.floor(cipherLength/8),8192),plain=new ArrayBuffer(blocks*8),source=new DataView(buffer),target=new DataView(plain);let previousLeft=nonce,previousRight=(0x5aa5a55a^nonce)>>>0;
+      for(let block=0;block<blocks;block++){const offset=block*8,cipherLeft=source.getUint32(offset,true),cipherRight=source.getUint32(offset+4,true),decoded=xteaDecrypt(cipherLeft,cipherRight);target.setUint32(offset,(decoded[0]^previousLeft)>>>0,true);target.setUint32(offset+4,(decoded[1]^previousRight)>>>0,true);previousLeft=cipherLeft;previousRight=cipherRight}
+      let xml=new TextDecoder().decode(new Uint8Array(plain)).replace(/\0+$/,'');const start=xml.indexOf('<map');if(start<0||start>64)throw new Error('The cached file does not contain a recognized map header');xml=xml.slice(start);
+      const encrypted=xml.indexOf('<encData>');if(encrypted>=0)xml=xml.slice(0,encrypted)+'<encData></encData></map>';else{const end=xml.indexOf('</map>');if(end<0)throw new Error('The complete public map header was not found');xml=xml.slice(0,end+6)}
+      const documentNode=new DOMParser().parseFromString(xml,'application/xml');if(documentNode.querySelector('parsererror'))throw new Error('The public map metadata could not be parsed');const root=documentNode.documentElement,vendor=Array.from(root.children).find(child=>child.tagName==='vendorName'),lock=Array.from(root.children).find(child=>child.tagName==='lock'),romSum=Array.from(root.children).find(child=>child.tagName==='romSum');
+      return{mapVersion:root.getAttribute('version'),name:directText(root,'shortDesc'),description:directText(root,'longDesc'),vehicleName:directText(root,'vehicleName'),vendorName:directText(root,'vendorName'),vendorRevision:vendor?.getAttribute('revision')||null,softwareVersion:directText(root,'swVersion'),vendorID:directText(root,'vendorID'),vehicleID:directText(root,'vehicleID'),lockMask:lock?.getAttribute('mask')||null,romSum:romSum?.getAttribute('value')||null,features:Array.from(root.querySelectorAll('features > feature')).map(feature=>Object.fromEntries(Array.from(feature.attributes).map(attribute=>[attribute.name,attribute.value]))),hasPrivateData:encrypted>=0}
+    }
+    function mapDetailItem(label,value){const item=document.createElement('div');item.className='map-detail-item';const caption=document.createElement('span'),content=document.createElement('strong');caption.textContent=label;content.textContent=value||'Not declared';item.append(caption,content);return item}
+    function compatibilityFor(metadata){const declared=(metadata.vehicleName||'').trim().replace(/\s+/g,' ').toLowerCase(),selected=(state.status?.accessPort?.vehicle||'').trim().replace(/\s+/g,' ').toLowerCase();if(!declared||!selected)return{label:'Compatibility unknown',kind:'unknown',detail:'The map or selected dataset does not declare enough vehicle information for an exact comparison.'};if(declared===selected)return{label:'Vehicle declaration matches',kind:'good',detail:'The map’s declared vehicle exactly matches the selected AccessPort dataset. This is not a flash-safety guarantee.'};return{label:'Review compatibility',kind:'',detail:'The map’s vehicle declaration differs from the selected dataset. Verify the exact vehicle, firmware, and tuner instructions before using it.'}}
+    function renderMapDetails(file,metadata,error=null){
+      const compatibility=metadata?compatibilityFor(metadata):{label:'Metadata unavailable',kind:'unknown',detail:'RevLink could not decode this cached map’s public metadata header. The original map remains unchanged and downloadable.'};
+      text('mapDetailName',metadata?.name||filename(file.path));text('mapDetailDescription',metadata?.description||(error?.message||'No description was declared in the public map header.'));
+      const badgeNode=$('mapCompatibility');badgeNode.textContent=compatibility.label;badgeNode.className=`compatibility ${compatibility.kind}`.trim();
+      const grid=$('mapDetailGrid');grid.textContent='';[
+        ['Declared vehicle',metadata?.vehicleName],['Vendor',metadata?[metadata.vendorName,metadata.vendorRevision&&`revision ${metadata.vendorRevision}`].filter(Boolean).join(' · '):null],
+        ['Software version',metadata?.softwareVersion],['Map format',metadata?.mapVersion&&`Version ${metadata.mapVersion}`],
+        ['Vehicle ID',metadata?.vehicleID],['Vendor ID',metadata?.vendorID],
+        ['Lock mask',metadata?.lockMask!=null?`0x${Number(metadata.lockMask).toString(16).padStart(8,'0')}`:null],['ROM checksum',metadata?.romSum!=null?`0x${Number(metadata.romSum).toString(16).padStart(8,'0')}`:null],
+        ['Cached file',`${bytes(file.size)} · ${file.sha256.slice(0,12)}…`],['Private calibration data',metadata?(metadata.hasPrivateData?'Present · not displayed':'Not declared'):null],
+      ].forEach(([label,value])=>grid.append(mapDetailItem(label,value)));
+      const features=$('mapFeatureList');features.textContent='';if(metadata?.features?.length)metadata.features.forEach(feature=>{const chip=document.createElement('span');chip.textContent=Object.entries(feature).map(([key,value])=>`${human(key)} ${value}`).join(' · ');features.append(chip)});else{const chip=document.createElement('span');chip.textContent='No feature declarations found';features.append(chip)}
+      text('mapDetailNote',compatibility.detail)
+    }
+    async function openMapDetails(file){
+      state.mapDetailFile=file;text('mapDetailName',filename(file.path));text('mapDetailDescription','Decrypting the public metadata header locally…');text('mapCompatibility','Reading');$('mapCompatibility').className='compatibility unknown';$('mapDetailGrid').textContent='';$('mapFeatureList').innerHTML='<span>Reading…</span>';text('mapDetailNote','The original cached map remains unchanged.');if(!$('mapViewer').open)$('mapViewer').showModal();
+      try{let metadata=state.mapMetadata.get(file.sha256);if(!metadata){metadata=decodeMapMetadata(await(await fetchFile(file)).arrayBuffer());state.mapMetadata.set(file.sha256,metadata)}if(state.mapDetailFile===file)renderMapDetails(file,metadata)}
+      catch(error){if(state.mapDetailFile===file)renderMapDetails(file,null,error)}
+    }
+    function closeMapDetails(){state.mapDetailFile=null;if($('mapViewer').open)$('mapViewer').close()}
+    function blankStartupCanvas(canvas,label='No cached image'){
+      const context=canvas.getContext('2d');canvas.width=240;canvas.height=320;context.fillStyle='#030811';context.fillRect(0,0,240,320);context.strokeStyle='#203b59';context.setLineDash([6,6]);context.strokeRect(20.5,20.5,199,279);context.setLineDash([]);context.fillStyle='#7088a3';context.font='bold 13px system-ui';context.textAlign='center';context.fillText(label,120,160);context.textAlign='left'
+    }
+    function drawRgb565(canvas,buffer){
+      const bytes=new Uint8Array(buffer);if(bytes.length!==240*320*2)throw new Error('Startup image framebuffer has an invalid size');
+      canvas.width=240;canvas.height=320;const context=canvas.getContext('2d'),image=context.createImageData(240,320);
+      for(let pixel=0,offset=0;pixel<240*320;pixel++,offset+=2){const value=bytes[offset]|(bytes[offset+1]<<8),target=pixel*4;image.data[target]=((value>>11)&31)*255/31;image.data[target+1]=((value>>5)&63)*255/63;image.data[target+2]=(value&31)*255/31;image.data[target+3]=255}
+      context.putImageData(image,0,0)
+    }
+    async function renderDeviceStartupPreviews(){
+      const token=++state.devicePreviewToken,canvases=Array.from(document.querySelectorAll('.device-startup-preview')),currentFile=state.files.find(file=>file.kind==='startup'&&file.path==='images/startup_screen.fb');
+      canvases.forEach(canvas=>{canvas.hidden=true;canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height)});
+      if(!currentFile||!canvases.length)return;
+      try{
+        const buffer=await(await fetchFile(currentFile)).arrayBuffer();
+        if(token!==state.devicePreviewToken)return;
+        canvases.forEach(canvas=>{drawRgb565(canvas,buffer);canvas.hidden=false})
+      }catch(error){
+        if(token===state.devicePreviewToken&&!connectionError(error,{background:true,count:false}))console.warn('Startup screen preview unavailable')
+      }
+    }
+    async function loadStartupProfiles({render=true}={}){
+      if(connection.offline)return;
+      try{const data=await jsonRequest('/api/portal/startup/profiles',{headers:portalHeader});state.startupProfiles=data.profiles||[];state.startupProfilesLoaded=true;if(render&&state.view==='images')renderImages()}
+      catch(error){state.startupProfiles=[];state.startupProfilesLoaded=true;if(!connectionError(error,{background:true,count:false}))toast(error.message)}
+    }
+    async function fetchStartupProfile(profile){
+      let response;
+      try{response=await fetch(`/api/portal/startup/profile?id=${encodeURIComponent(profile.id)}`,{headers:portalHeader,cache:'no-store'})}
+      catch(error){const failure=new Error('Sidecar connection is unavailable');failure.sidecarUnavailable=true;throw failure}
+      if(!response.ok){let message='Startup image profile is unavailable';try{message=(await response.json()).error||message}catch{}throw new Error(message)}
+      return response.arrayBuffer()
+    }
+    function selectedDatasetIsAttached(){
+      const selected=state.status?.accessPort,attached=state.status?.attachedAccessPort;
+      return Boolean(selected?.known&&attached?.known&&selected.serial===attached.serial)
+    }
+    function updateStartupButtons(){
+      const status=state.status,upload=status?.mapUpload||{},busy=status?.sync?.active||upload.state==='running'||status?.safety?.writeRecoveryRequired,matches=selectedDatasetIsAttached();
+      document.querySelectorAll('[data-startup-profile]').forEach(button=>{button.disabled=busy||!matches;button.textContent=!matches?'Attach selected AccessPort':upload.kind==='startup'&&upload.state==='running'?'Transferring…':'Set startup'})
+    }
+    async function renderImages(){
+      if(state.view!=='images')return;
+      const token=++state.imageRenderToken;for(const url of state.imageUrls)URL.revokeObjectURL(url);state.imageUrls=[];
+      const current=$('currentStartupCanvas'),currentFile=state.files.find(file=>file.kind==='startup'&&file.path==='images/startup_screen.fb');blankStartupCanvas(current,currentFile?'Loading…':'Sync to preview');
+      text('currentStartupCopy',currentFile?`${initialSync(currentFile)} · saved on the Sidecar.`:'Sync this AccessPort to cache its current startup screen.');
+      if(currentFile){try{drawRgb565(current,await(await fetchFile(currentFile)).arrayBuffer())}catch(error){if(token===state.imageRenderToken)blankStartupCanvas(current,'Preview unavailable')}}
+      if(!state.startupProfilesLoaded){await loadStartupProfiles({render:false});if(token!==state.imageRenderToken)return}
+      const library=$('startupProfiles');library.textContent='';
+      if(!state.startupProfiles.length){library.innerHTML='<div class="empty image-empty">No reusable startup images yet. Add an image to create the first profile.</div>'}
+      for(const profile of state.startupProfiles){
+        const card=document.createElement('article');card.className='image-card';const preview=document.createElement('button');preview.type='button';preview.className='image-preview';preview.disabled=true;preview.setAttribute('aria-label',`Open ${profile.name}`);const canvas=document.createElement('canvas');canvas.width=240;canvas.height=320;blankStartupCanvas(canvas,'Loading…');preview.append(canvas);
+        const title=document.createElement('strong');title.textContent=profile.name;const meta=document.createElement('small');meta.textContent='240 × 320 · RGB565 · Sidecar library';const button=document.createElement('button');button.className='btn';button.dataset.startupProfile=profile.id;button.textContent='Set startup';button.onclick=()=>applyStartupProfile(profile);card.append(preview,title,meta,button);library.append(card);
+        fetchStartupProfile(profile).then(buffer=>{if(token!==state.imageRenderToken)return;drawRgb565(canvas,buffer);canvas.toBlob(blob=>{if(!blob||token!==state.imageRenderToken)return;const url=URL.createObjectURL(blob);state.imageUrls.push(url);preview.disabled=false;preview.onclick=()=>openScreenshot(url,{path:profile.name})},'image/png')}).catch(()=>{if(token===state.imageRenderToken)blankStartupCanvas(canvas,'Preview unavailable')})
+      }
+      const screenshots=state.files.filter(file=>file.kind==='screenshot'),screens=$('screenshotLibrary');screens.textContent='';
+      if(!screenshots.length)screens.innerHTML='<div class="empty image-empty">No cached screenshots for this AccessPort.</div>';
+      for(const file of screenshots){
+        const card=document.createElement('article');card.className='image-card';const preview=document.createElement('button');preview.type='button';preview.className='image-preview';preview.setAttribute('aria-label',`Open ${filename(file.path)}`);const image=document.createElement('img');image.alt=filename(file.path);preview.append(image);const title=document.createElement('strong');title.textContent=filename(file.path);const meta=document.createElement('small');meta.textContent=`Backed up · ${bytes(file.size)} · ${initialSync(file)}`;const promote=document.createElement('button');promote.type='button';promote.className='btn secondary';promote.textContent='Use as startup';promote.onclick=()=>promoteScreenshot(file,promote);card.append(preview,title,meta,promote);screens.append(card);
+        fetchFile(file).then(response=>response.blob()).then(blob=>{if(token!==state.imageRenderToken)return;const url=URL.createObjectURL(blob);state.imageUrls.push(url);image.src=url;preview.onclick=()=>openScreenshot(url,file)}).catch(()=>{preview.textContent='Preview unavailable'})
+      }
+      updateStartupButtons()
+    }
+    function openScreenshot(url,file){$('screenshotViewerImage').src=url;$('screenshotViewerImage').alt=filename(file.path);$('screenshotViewer').showModal()}
+    function closeScreenshot(){$('screenshotViewer').close();$('screenshotViewerImage').removeAttribute('src')}
+    function resetStartupEditor(label='Choose an image'){
+      if(state.startupImageUrl)URL.revokeObjectURL(state.startupImageUrl);state.startupImageUrl=null;state.startupImage=null;$('startupImageFile').value='';$('startupProfileName').value='';$('startupZoom').value='100';$('startupPositionX').value='0';$('startupPositionY').value='0';$('saveStartupProfile').disabled=true;blankStartupCanvas($('startupCropCanvas'),label)
+    }
+    function openStartupEditor(){
+      resetStartupEditor();$('startupEditor').showModal()
+    }
+    function loadStartupEditorImage(image,name,url=null){
+      resetStartupEditor();state.startupImage=image;state.startupImageUrl=url;$('startupProfileName').value=name.slice(0,80);$('saveStartupProfile').disabled=false;if(!$('startupEditor').open)$('startupEditor').showModal();renderStartupCrop()
+    }
+    async function promoteScreenshot(file,button){
+      const original=button.textContent;let url=null;button.disabled=true;button.textContent='Preparing…';
+      try{
+        const blob=await(await fetchFile(file)).blob(),image=new Image();url=URL.createObjectURL(blob);
+        await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('This screenshot could not be opened'));image.src=url});
+        loadStartupEditorImage(image,filename(file.path).replace(/\.[^.]+$/,''),url);url=null;
+      }catch(error){if(url)URL.revokeObjectURL(url);if(!connectionError(error))toast(error.message)}
+      finally{button.disabled=false;button.textContent=original}
+    }
+    function closeStartupEditor(){$('startupEditor').close();if(state.startupImageUrl)URL.revokeObjectURL(state.startupImageUrl);state.startupImageUrl=null;state.startupImage=null}
+    function renderStartupCrop(){
+      const image=state.startupImage,canvas=$('startupCropCanvas'),context=canvas.getContext('2d');canvas.width=240;canvas.height=320;context.fillStyle='#000';context.fillRect(0,0,240,320);if(!image)return;
+      const cover=Math.max(240/image.naturalWidth,320/image.naturalHeight),zoom=Number($('startupZoom').value)/100,scale=cover*zoom,width=image.naturalWidth*scale,height=image.naturalHeight*scale,maxX=Math.max(0,(width-240)/2),maxY=Math.max(0,(height-320)/2),x=(240-width)/2+Number($('startupPositionX').value)/100*maxX,y=(320-height)/2+Number($('startupPositionY').value)/100*maxY;context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';context.drawImage(image,x,y,width,height)
+    }
+    function startupFramebuffer(){
+      const rgba=$('startupCropCanvas').getContext('2d').getImageData(0,0,240,320).data,output=new Uint8Array(240*320*2);
+      for(let pixel=0;pixel<240*320;pixel++){const source=pixel*4,value=((rgba[source]>>3)<<11)|((rgba[source+1]>>2)<<5)|(rgba[source+2]>>3),target=pixel*2;output[target]=value&255;output[target+1]=value>>8}
+      return output
+    }
+    async function saveStartupImageProfile(){
+      const name=$('startupProfileName').value.replace(/[^\x20-\x7e]/g,' ').trim();if(!state.startupImage){toast('Choose an image first');return}if(!name){toast('Give this startup image a profile name');return}
+      const button=$('saveStartupProfile');button.disabled=true;button.textContent='Saving…';
+      try{await jsonRequest('/api/portal/startup/profiles',{method:'POST',timeoutMs:120000,headers:{...portalHeader,'Content-Type':'application/octet-stream','X-RevLink-Profile-Name':name},body:startupFramebuffer()});closeStartupEditor();state.startupProfilesLoaded=false;await loadStartupProfiles({render:false});await renderImages();toast('Startup image profile saved to this dataset')}
+      catch(error){if(!connectionError(error))toast(error.message)}
+      finally{button.disabled=!state.startupImage;button.textContent='Save profile'}
+    }
+    async function applyStartupProfile(profile){
+      if(!selectedDatasetIsAttached()){toast('Attach this AccessPort before changing its startup screen');return}
+      if(!state.status?.safety?.writeConsent){toast('Enable device writes in Settings before changing the startup screen');return}
+      if(!confirm(`Set “${profile.name}” as the startup screen on ${state.status.attachedAccessPort.partNumber||'this AccessPort'}? The current device image will be replaced. Only images saved in this dataset’s startup library can be reused later.`))return;
+      try{await jsonRequest('/api/portal/startup/apply',{method:'POST',headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({id:profile.id,confirmed:'true'})});toast('Startup-screen transfer started — keep both devices connected');await loadStatus()}
+      catch(error){if(!connectionError(error))toast(error.message)}
+    }
+    function downloadedFileName(file){return filename(file.path).replace(/\.gz$/i,'')}
+    async function downloadFile(file){try{toast(`Preparing ${filename(file.path)}…`);const blob=await(await fetchFile(file)).blob();savePreparedAttachment(new File([blob],downloadedFileName(file),{type:blob.type||'application/octet-stream',lastModified:Date.now()}))}catch(error){if(!connectionError(error))toast(error.message)}}
+    function closeDownloadTray(){state.downloadFiles=[];$('downloadList').textContent='';if($('downloadTray').open)$('downloadTray').close()}
+    function showDownloadTray(files){
+      state.downloadFiles=files;const list=$('downloadList');list.textContent='';
+      files.forEach((file,index)=>{const row=document.createElement('div');row.className='download-item';const copy=document.createElement('div'),name=document.createElement('strong'),meta=document.createElement('small'),button=document.createElement('button');name.textContent=file.name;meta.textContent=`${bytes(file.size)} · file ${index+1} of ${files.length}`;button.className='btn secondary';button.type='button';button.textContent='Download';button.onclick=()=>savePreparedAttachment(file);copy.append(name,meta);row.append(copy,button);list.append(row)});
+      $('downloadTray').showModal();
+      files.forEach((file,index)=>setTimeout(()=>savePreparedAttachment(file),index*350));
+      toast(`Requested ${files.length} separate downloads. Allow multiple downloads if your browser asks.`)
+    }
+    async function downloadSelected(kind){
+      const items=selectedFor(kind);if(!items.length)return;if(items.length>5){toast('Select up to 5 files for direct download');return}
+      const button=$(kind==='datalog'?'downloadLogs':'downloadMaps'),original=button.textContent;button.disabled=true;button.textContent=`Preparing 0 / ${items.length}`;
+      try{
+        const files=[];
+        for(let index=0;index<items.length;index++){button.textContent=`Preparing ${index+1} / ${items.length}`;const blob=await(await fetchFile(items[index])).blob();files.push(new File([blob],downloadedFileName(items[index]),{type:blob.type||'application/octet-stream',lastModified:Date.now()}))}
+        if(files.length===1){savePreparedAttachment(files[0]);toast(`${files[0].name} downloaded`)}else showDownloadTray(files)
+      }catch(error){if(!connectionError(error))toast(error.message)}
+      finally{button.disabled=false;button.textContent=original}
+    }
+    function csvAttachmentName(file){const name=filename(file.path).replace(/\.gz$/i,'');return/\.csv$/i.test(name)?name:`${name}.csv`}
+    function compactEmailText(value,limit=180){const clean=(value||'').replace(/\s+/g,' ').trim();return clean.length>limit?`${clean.slice(0,limit-1)}…`:clean}
+    function emailDraftSubject(device,items){const label=compactEmailText(device?.vehicle||device?.partNumber||'AccessPort',80);return`RevLink datalogs — ${label}${items.length>1?` (${items.length} files)`:''}`}
+    function emailDraftBody(device,items){
+      const vehicle=compactEmailText(device?.vehicle,100)||'Not specified',part=compactEmailText(device?.partNumber,80)||'Unknown';
+      const lines=['Hi,','',`I’ve attached ${items.length} AccessPort datalog${items.length===1?'':'s'} for review.`,`Vehicle: ${vehicle}`,`AccessPort: ${part}`,'','Datalogs:'];
+      for(const file of items){lines.push(`- ${csvAttachmentName(file)}`,`  Initial sync: ${file.initialSyncUtc?new Date(file.initialSyncUtc*1000).toLocaleString():'Unavailable'}`);if(file.mapName)lines.push(`  Map: ${compactEmailText(filename(file.mapName),120)}`);if(file.note)lines.push(`  Notes: ${compactEmailText(file.note)}`)}
+      lines.push('','','Sent from RevLink Sidecar.');return lines.join('\n')
+    }
+    function emailDraftUri(subject,body){return`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+    function canShareFiles(files){try{return typeof navigator.share==='function'&&typeof navigator.canShare==='function'&&navigator.canShare({files})}catch{return false}}
+    function savePreparedAttachment(file){const url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2500)}
+    function openEmailFallback(files,subject,body){showDownloadTray(files);location.href=emailDraftUri(subject,`${body}\n\nThe selected CSV files are ready in RevLink. Attach them before sending.`);toast('Mail opened. Return to RevLink if your browser blocked any selected CSV.')}
+    async function prepareEmailAttachments(items){
+      const attachments=[];let total=0;
+      for(const item of items){const blob=await(await fetchFile(item)).blob();total+=blob.size;if(total>20*1024*1024)throw new Error('These datalogs exceed the 20 MB email limit. Select fewer or smaller logs.');attachments.push(new File([blob],csvAttachmentName(item),{type:'text/csv',lastModified:Date.now()}))}
+      return attachments
+    }
+    async function emailSelectedLogs(){
+      const items=selectedFor('datalog');if(!items.length||state.emailBusy)return;if(items.length>5){toast('Select up to 5 datalogs to email');return}
+      const button=$('emailLogs'),details=items.map(file=>({...file,mapName:mapForDigest(file.mapDigest)?.path||''})),subject=emailDraftSubject(state.status?.accessPort,details),body=emailDraftBody(state.status?.accessPort,details);
+      state.emailBusy=true;button.disabled=true;button.textContent='Preparing…';toast(`Preparing ${items.length} CSV attachment${items.length===1?'':'s'}…`);
+      try{
+        const files=await prepareEmailAttachments(items),shareData={title:subject,text:body,files};
+        if(canShareFiles(files)){try{const result=navigator.share(shareData);if(!result||typeof result.then!=='function')throw new Error('Native file sharing is unavailable in this browser');await result;toast('Datalogs handed to your mail app')}catch(error){if(error?.name==='AbortError')throw error;openEmailFallback(files,subject,body)}}
+        else openEmailFallback(files,subject,body)
+      }catch(error){if(error?.name!=='AbortError'&&!connectionError(error))toast(error.message)}
+      finally{state.emailBusy=false;button.disabled=false;button.textContent='Email selected'}
+    }
+    async function action(path,options={}){try{await jsonRequest(path,{method:'POST',headers:portalHeader,...options});await loadStatus()}catch(error){if(!connectionError(error))toast(error.message);await loadStatus()}}
+    function setAutoSync(enabled){return action('/api/portal/auto-sync',{headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:`enabled=${enabled?'true':'false'}`})}
+    async function setWriteConsent(enabled){
+      if(enabled&&!confirm('Enable AccessPort map transfers on this Sidecar? This setting stays enabled until you turn it off. A transfer can corrupt device storage if interrupted. RevLink refuses existing destinations and verifies every upload by downloading it again.')){$('writeConsent').checked=false;return}
+      await action('/api/portal/writes',{headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:`enabled=${enabled?'true':'false'}`})
+    }
+    function backupFilename(){
+      const stamp=new Date().toISOString().replace(/[:.]/g,'-');return`revlink-sidecar-${stamp}.revlink-backup`
+    }
+    function setBackupBusy(busy){
+      state.backupBusy=busy;$('downloadBackup').disabled=busy;$('chooseRestore').disabled=busy;$('applyRestore').disabled=busy
+    }
+    async function downloadBackup(){
+      if(state.backupBusy)return;state.backupNotice=null;setBackupBusy(true);text('backupStatus','Preparing a verified logical backup…');$('backupStatus').className='backup-status warn';
+      try{
+        const response=await fetch('/api/portal/backup',{cache:'no-store'});
+        if(!response.ok){let detail={};try{detail=await response.json()}catch{}throw new Error(detail.error||'Backup could not be created')}
+        const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=backupFilename();document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+        state.backupNotice={message:`${bytes(blob.size)} backup downloaded. Store it somewhere separate from this Sidecar.`,kind:'ready'};text('backupStatus',state.backupNotice.message);$('backupStatus').className='backup-status ready';toast('Sidecar backup downloaded')
+      }catch(error){state.backupNotice={message:error.message,kind:'warn'};text('backupStatus',error.message);$('backupStatus').className='backup-status warn';if(!connectionError(error))toast(error.message)}
+      finally{setBackupBusy(false);loadStatus()}
+    }
+    async function previewRestore(file){
+      if(!file||state.backupBusy)return;state.backupNotice=null;state.backupPreview=null;$('applyRestore').hidden=true;setBackupBusy(true);text('backupStatus',`Validating ${file.name} without changing current data…`);$('backupStatus').className='backup-status warn';
+      try{
+        const preview=await jsonRequest('/api/portal/backup/preview',{method:'POST',timeoutMs:180000,headers:{...portalHeader,'Content-Type':'application/x-revlink-backup'},body:file});
+        state.backupPreview=preview;text('backupStatus',`${preview.files} file${preview.files===1?'':'s'} · ${preview.devices} device dataset${preview.devices===1?'':'s'} · ${bytes(preview.dataBytes)} verified. Existing paths will not be overwritten.`);$('backupStatus').className='backup-status ready';$('applyRestore').hidden=false
+      }catch(error){state.backupNotice={message:error.message,kind:'warn'};text('backupStatus',error.message);$('backupStatus').className='backup-status warn';if(!connectionError(error))toast(error.message)}
+      finally{setBackupBusy(false);loadStatus()}
+    }
+    async function applyRestore(){
+      const preview=state.backupPreview;if(!preview||state.backupBusy)return;
+      if(!confirm(`Restore missing data from this verified backup?\n\n${preview.files} files across ${preview.devices} device dataset${preview.devices===1?'':'s'} will be checked. Existing identical files are skipped. Existing files with different contents are reported as conflicts and are never overwritten.`))return;
+      setBackupBusy(true);text('backupStatus','Restoring missing files and verifying each write…');$('backupStatus').className='backup-status warn';
+      try{
+        const result=await jsonRequest('/api/portal/backup/restore',{method:'POST',timeoutMs:180000,headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:`token=${preview.token}`});
+        state.backupPreview=null;$('applyRestore').hidden=true;$('backupRestoreFile').value='';state.backupNotice={message:`${result.restored} restored · ${result.identical} already present · ${result.conflicts} conflict${result.conflicts===1?'':'s'} skipped.`,kind:result.conflicts?'warn':'ready'};text('backupStatus',state.backupNotice.message);$('backupStatus').className=`backup-status ${state.backupNotice.kind}`;await Promise.all([loadStatus(),loadDevices(),loadFiles()]);toast(result.conflicts?'Restore completed with protected conflicts':'Restore completed safely')
+      }catch(error){state.backupNotice={message:error.message,kind:'warn'};text('backupStatus',error.message);$('backupStatus').className='backup-status warn';if(!connectionError(error))toast(error.message)}
+      finally{setBackupBusy(false)}
+    }
+    function mapTransferFailure(error){
+      if(error===0x103)return'The selected AccessPort changed or was unavailable before the transfer safely started.';
+      if(error===0x107)return'The transfer timed out. Reconnect the AccessPort before trying again; the map was not retried automatically.';
+      if(error===0x108)return'The AccessPort did not accept the expected transfer response. Reconnect it before trying again.';
+      if(error===0x109)return'The transferred map could not be verified byte-for-byte. Reconnect the AccessPort before another write.';
+      return'The map transfer failed safely. No automatic retry was attempted. Reconnect the AccessPort and try again.';
+    }
+    function validMapName(name){return/^(?!.*\.\.)[^/\\\x00-\x1f\x7f]+\.ptm$/i.test(name)}
+    function updateMapTransferButton(){
+      const status=state.status,upload=status?.mapUpload||{},device=status?.device||{},safety=status?.safety||{},selected=status?.accessPort,attached=status?.attachedAccessPort,file=$('mapUploadFile').files[0],name=$('mapUploadName').value.trim(),matches=Boolean(selected?.known&&attached?.known&&selected.serial===attached.serial),busy=status?.sync?.active||upload.state==='running';
+      $('applyMap').disabled=!safety.writesCompiled||!safety.writeConsent||!device.available||!matches||busy||safety.writeRecoveryRequired||(!upload.staged&&(!file||!validMapName(name)));
+    }
+    async function applyMap(){
+      const file=$('mapUploadFile').files[0],name=$('mapUploadName').value.trim(),part=state.status?.attachedAccessPort?.partNumber||'the attached AccessPort',button=$('applyMap');
+      if(!file&&!state.status?.mapUpload?.staged){toast('Choose a .ptm map first');return}
+      if(file&&!validMapName(name)){toast('Enter a .ptm file name without a folder or “..”');return}
+      button.disabled=true;
+      try{
+        let upload=state.status?.mapUpload||{};
+        if(file&&(!upload.staged||upload.name!==name||upload.size!==file.size)){
+          text('mapUploadStatus',`Preparing ${name} on the Sidecar…`);
+          await jsonRequest('/api/portal/maps/stage',{method:'POST',timeoutMs:120000,headers:{...portalHeader,'Content-Type':'application/octet-stream','X-RevLink-Map-Name':name},body:file});
+          await loadStatus();upload=state.status?.mapUpload||{};
+        }
+        if(!upload.staged)throw new Error('The map could not be prepared for transfer');
+        if(!confirm(`Transfer ${upload.name} to ${part} in the maps folder? Existing maps with the same name are refused. Do not unplug either device during transfer and read-back verification.`))return;
+        await jsonRequest('/api/portal/maps/apply',{method:'POST',timeoutMs:15000,headers:portalHeader});toast('Map transfer started — keep both devices connected');await loadStatus()
+      }catch(error){if(!connectionError(error))toast(error.message);await loadStatus()}
+      finally{updateMapTransferButton()}
+    }
+    function parseCsvLine(line){const out=[];let value='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){out.push(value.trim());value=''}else value+=c}out.push(value.trim());return out}
+    function parseLogCsv(csv){
+      const lines=csv.replace(/^\uFEFF/,'').split(/\r?\n/).filter(line=>line.trim());if(lines.length<2)throw new Error('The cached CSV does not contain data');
+      const headers=parseCsvLine(lines[0]).map((name,index)=>name||`Channel ${index+1}`),apInfo=headers.find(name=>/^AP Info:/i.test(name))||'',columns=headers.map(()=>[]);let rows=0;
+      for(let lineIndex=1;lineIndex<lines.length;lineIndex++){const cells=parseCsvLine(lines[lineIndex]);let numeric=0;const parsed=new Array(headers.length);for(let column=0;column<headers.length;column++){const raw=(cells[column]||'').replace(/%$/,'');const value=raw===''?NaN:Number(raw);parsed[column]=Number.isFinite(value)?value:NaN;if(Number.isFinite(value))numeric++}if(numeric<Math.min(2,headers.length))continue;for(let column=0;column<headers.length;column++)columns[column].push(parsed[column]);rows++}
+      const channels=headers.map((name,index)=>({name,index,values:columns[index],color:COLORS[index%COLORS.length]})).filter(channel=>!/^AP Info:/i.test(channel.name)&&channel.values.some(Number.isFinite));
+      if(!rows||!channels.length)throw new Error('No numeric channels were found in this log');
+      const time=channels.find(channel=>/^time\b/i.test(channel.name)||/\btime\s*\(/i.test(channel.name));return{rows,channels,time,apInfo}
+    }
+    const HEALTH_ENGINE_VERSION='1.0.0';
+    function healthChannel(data,patterns){return data.channels.find(channel=>patterns.some(pattern=>pattern.test(channel.name)))}
+    function healthChannels(data,patterns){return data.channels.filter(channel=>patterns.some(pattern=>pattern.test(channel.name)))}
+    function healthStats(values){const finite=values.filter(Number.isFinite);if(!finite.length)return null;let sum=0,min=Infinity,max=-Infinity;for(const value of finite){sum+=value;if(value<min)min=value;if(value>max)max=value}const mean=sum/finite.length;let variance=0;for(const value of finite)variance+=(value-mean)**2;return{count:finite.length,min,max,mean,std:Math.sqrt(variance/finite.length),maxAbs:Math.max(Math.abs(min),Math.abs(max))}}
+    function healthSignal(signals,severity,title,evidence){signals.push({severity,title,evidence,penalty:severity==='bad'?18:8})}
+    function evaluateHealth(data){
+      const signals=[],rpm=healthChannel(data,[/^RPM\b/i,/engine speed/i]),speed=healthChannel(data,[/vehicle speed/i]),throttle=healthChannel(data,[/throttle pos/i,/accel position/i]);
+      const dam=healthChannel(data,[/dyn adv mult/i,/\bDAM\b/i]),feedback=healthChannel(data,[/feedback knock/i]),fine=healthChannel(data,[/fine knock/i]),trims=healthChannels(data,[/AF Correction/i,/AF Learning/i]),coolant=healthChannel(data,[/coolant temp/i]),intake=healthChannel(data,[/intake temp/i]),battery=healthChannel(data,[/battery volts/i]),roughness=healthChannels(data,[/roughness cyl/i]);
+      const coverage=[rpm,dam,feedback,fine,trims.length?trims[0]:null,coolant,battery].filter(Boolean).length/7;
+      const damStats=dam&&healthStats(dam.values);if(damStats&&damStats.min<.7)healthSignal(signals,'bad','Dynamic advance multiplier was significantly reduced',`${dam.name} reached ${nice(damStats.min)}.`);else if(damStats&&damStats.min<.95)healthSignal(signals,'warn','Dynamic advance multiplier was below its expected full value',`${dam.name} reached ${nice(damStats.min)}.`);
+      const feedbackStats=feedback&&healthStats(feedback.values);if(feedbackStats&&feedbackStats.min<=-8)healthSignal(signals,'bad','Large feedback knock correction observed',`${feedback.name} reached ${nice(feedbackStats.min)}.`);else if(feedbackStats&&feedbackStats.min<=-4)healthSignal(signals,'warn','Feedback knock correction deserves review',`${feedback.name} reached ${nice(feedbackStats.min)}.`);
+      const fineStats=fine&&healthStats(fine.values);if(fineStats&&fineStats.min<=-8)healthSignal(signals,'bad','Large learned knock correction observed',`${fine.name} reached ${nice(fineStats.min)}.`);else if(fineStats&&fineStats.min<=-4)healthSignal(signals,'warn','Learned knock correction deserves review',`${fine.name} reached ${nice(fineStats.min)}.`);
+      const trimStats=trims.map(channel=>({channel,stats:healthStats(channel.values)})).filter(item=>item.stats).sort((a,b)=>b.stats.maxAbs-a.stats.maxAbs)[0];if(trimStats?.stats.maxAbs>=30)healthSignal(signals,'bad','Fuel correction was unusually large',`${trimStats.channel.name} reached ${nice(trimStats.stats.maxAbs)}% absolute correction.`);else if(trimStats?.stats.maxAbs>=20)healthSignal(signals,'warn','Fuel correction was elevated',`${trimStats.channel.name} reached ${nice(trimStats.stats.maxAbs)}% absolute correction.`);
+      const coolantStats=coolant&&healthStats(coolant.values);if(coolantStats){const maxF=/\(c\)/i.test(coolant.name)?coolantStats.max*9/5+32:coolantStats.max;if(maxF>=240)healthSignal(signals,'bad','Coolant temperature reached a critical review threshold',`${coolant.name} reached ${nice(maxF)} °F.`);else if(maxF>=225)healthSignal(signals,'warn','Coolant temperature was elevated',`${coolant.name} reached ${nice(maxF)} °F.`)}
+      const intakeStats=intake&&healthStats(intake.values);if(intakeStats){const maxF=/\(c\)/i.test(intake.name)?intakeStats.max*9/5+32:intakeStats.max;if(maxF>=160)healthSignal(signals,'warn','Intake temperature was high',`${intake.name} reached ${nice(maxF)} °F; review heat-soak and operating conditions.`)}
+      const runningIndexes=[];if(rpm)rpm.values.forEach((value,index)=>{if(Number.isFinite(value)&&value>500)runningIndexes.push(index)});if(battery&&runningIndexes.length){const runningVoltage=runningIndexes.map(index=>battery.values[index]),stats=healthStats(runningVoltage);if(stats&&stats.min<11.8)healthSignal(signals,'bad','Charging voltage dropped very low while engine speed was present',`${battery.name} reached ${nice(stats.min)} V.`);else if(stats&&stats.min<12.5)healthSignal(signals,'warn','Charging voltage was low while engine speed was present',`${battery.name} reached ${nice(stats.min)} V.`)}
+      const roughnessStats=roughness.map(channel=>({channel,stats:healthStats(channel.values)})).filter(item=>item.stats).sort((a,b)=>b.stats.max-a.stats.max)[0];if(roughnessStats?.stats.max>=6)healthSignal(signals,'bad','Cylinder roughness count was high',`${roughnessStats.channel.name} reached ${nice(roughnessStats.stats.max)}.`);else if(roughnessStats?.stats.max>=3)healthSignal(signals,'warn','Cylinder roughness count was elevated',`${roughnessStats.channel.name} reached ${nice(roughnessStats.stats.max)}.`);
+      let idleSamples=0,loadSamples=0,cruiseSamples=0;if(rpm){for(let index=0;index<rpm.values.length;index++){const r=rpm.values[index],s=speed?.values[index],t=throttle?.values[index];if(Number.isFinite(r)&&r>=450&&r<=1300&&(!Number.isFinite(s)||s<3)&&(!Number.isFinite(t)||t<12))idleSamples++;if(Number.isFinite(r)&&r>2500&&Number.isFinite(t)&&t>40)loadSamples++;if(Number.isFinite(s)&&s>20&&Number.isFinite(t)&&t>=5&&t<=35)cruiseSamples++}}
+      if(rpm&&idleSamples>=12){const idleValues=rpm.values.filter((value,index)=>Number.isFinite(value)&&value>=250&&value<=1600&&(!speed||!Number.isFinite(speed.values[index])||speed.values[index]<3)&&(!throttle||!Number.isFinite(throttle.values[index])||throttle.values[index]<12)),idleStats=healthStats(idleValues);if(idleStats&&idleStats.min<400)healthSignal(signals,'bad','Engine speed approached a stall during a stationary low-throttle segment',`RPM reached ${nice(idleStats.min)} with ${idleStats.count} idle-context samples.`);else if(idleStats&&idleStats.std>160)healthSignal(signals,'warn','Idle speed varied substantially',`Idle-context RPM standard deviation was ${nice(idleStats.std)}.`)}
+      const penalty=Math.min(65,signals.reduce((sum,signal)=>sum+signal.penalty,0)),score=Math.max(0,100-penalty),conditionCount=[idleSamples>=12,loadSamples>=12,cruiseSamples>=12].filter(Boolean).length,confidence=Math.round(Math.min(100,coverage*72+Math.min(14,data.rows/25)+conditionCount*4));
+      const conditions=[];if(idleSamples>=12)conditions.push('Idle');if(cruiseSamples>=12)conditions.push('Cruise');if(loadSamples>=12)conditions.push('Load');if(!conditions.length)conditions.push('Limited conditions');
+      return{engineVersion:HEALTH_ENGINE_VERSION,rows:data.rows,duration:data.time?healthStats(data.time.values)?.max||0:0,score,confidence,signals:signals.map(({penalty,...signal})=>signal),conditions,channelCount:data.channels.length,apInfo:data.apInfo||''}
+    }
+    function healthCacheKey(file){const device=state.devices.find(item=>item.selected),namespace=device?.key||state.status?.accessPort?.serial||'unknown';return`revlink-health:${HEALTH_ENGINE_VERSION}:${namespace}:${file.sha256}`}
+    function cachedHealth(file){try{const value=JSON.parse(localStorage.getItem(healthCacheKey(file))||'null');return value?.engineVersion===HEALTH_ENGINE_VERSION?value:null}catch{return null}}
+    function cacheHealth(file,value){try{localStorage.setItem(healthCacheKey(file),JSON.stringify(value))}catch{}}
+    function mapContextForHealth(file,analysis){
+      const exact=mapForDigest(file.mapDigest);if(exact)return{file:exact,label:filename(exact.path),source:'Exact saved map tag'};
+      const match=/\[Reflash:\s*([^\]]+)\]/i.exec(analysis.apInfo||''),declared=match?.[1]?.trim();if(!declared||/uninstalled|unknown|none/i.test(declared))return{file:null,label:'Map not tagged',source:'No usable map declaration'};
+      const matches=state.files.filter(candidate=>candidate.kind==='map'&&filename(candidate.path).toLowerCase()===declared.toLowerCase());if(matches.length===1)return{file:matches[0],label:declared,source:'Declared by datalog · unique cache match'};
+      return{file:null,label:declared,source:matches.length?'Declared name is ambiguous':'Declared by datalog · map not cached'}
+    }
+    async function runVehicleHealth(){
+      if(state.health.running)return;const limit=Number($('healthWindow').value)||10,logs=filtered('datalog','','newest').slice(0,limit).sort(compareFiles('oldest'));if(!logs.length){toast('Sync at least one datalog before running Vehicle Health');return}
+      state.health.running=true;$('runHealth').disabled=true;const points=[];try{
+        for(let index=0;index<logs.length;index++){const file=logs[index];text('runHealth',`Analyzing ${index+1} / ${logs.length}`);let analysis=cachedHealth(file);if(!analysis){const response=await fetchFile(file),csv=await response.text();analysis=evaluateHealth(parseLogCsv(csv));cacheHealth(file,analysis)}points.push({file,analysis,map:mapContextForHealth(file,analysis)})}
+        state.health.points=points;state.health.selected=Math.max(0,points.length-1);renderVehicleHealth();toast(`Vehicle Health analyzed ${points.length} immutable log${points.length===1?'':'s'}`)
+      }catch(error){if(!connectionError(error))toast(error.message)}
+      finally{state.health.running=false;$('runHealth').disabled=false;text('runHealth','Analyze latest logs')}
+    }
+    function healthColor(score){return score>=85?'#5ee59b':score>=65?'#ffcc68':'#ff7889'}
+    function healthMapColor(label){let hash=0;for(const char of label)hash=((hash<<5)-hash+char.charCodeAt(0))|0;return COLORS[Math.abs(hash)%COLORS.length]}
+    function renderHealthTimeline(){
+      const wrap=$('healthCanvasWrap'),points=state.health.points;if(!wrap)return;
+      if(!points.length){wrap.innerHTML='<div class="health-empty">Run an analysis to build the timeline.</div>';return}
+      let canvas=wrap.querySelector('canvas');if(!canvas){wrap.textContent='';canvas=document.createElement('canvas');wrap.append(canvas)}
+      const rect=wrap.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.max(320,Math.floor(rect.width)),height=Math.max(220,Math.floor(rect.height));canvas.width=width*dpr;canvas.height=height*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,width,height);
+      const pad={l:42,r:18,t:34,b:42},plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
+      ctx.fillStyle='#07101a';ctx.fillRect(0,0,width,height);for(const [top,bottom,color] of [[100,85,'#5ee59b0d'],[85,65,'#ffcc680d'],[65,0,'#ff78890d']]){const y1=pad.t+plotH*(1-top/100),y2=pad.t+plotH*(1-bottom/100);ctx.fillStyle=color;ctx.fillRect(pad.l,y1,plotW,y2-y1)}
+      let bandStart=0;for(let index=1;index<=points.length;index++){const changed=index===points.length||points[index].map.label!==points[bandStart].map.label;if(!changed)continue;const left=pad.l+plotW*(Math.max(0,bandStart-.45)/Math.max(1,points.length-1)),right=pad.l+plotW*(Math.min(points.length-1,index-.55)/Math.max(1,points.length-1));ctx.fillStyle=healthMapColor(points[bandStart].map.label)+'28';ctx.fillRect(left,9,Math.max(4,right-left),8);bandStart=index}
+      ctx.strokeStyle='#1d3046';ctx.fillStyle='#71859e';ctx.font='8px system-ui';ctx.textAlign='right';for(let score=0;score<=100;score+=25){const y=pad.t+plotH*(1-score/100);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(width-pad.r,y);ctx.stroke();ctx.fillText(String(score),pad.l-8,y+3)}
+      ctx.strokeStyle='#58baff';ctx.lineWidth=2;ctx.beginPath();points.forEach((point,index)=>{const x=pad.l+plotW*(index/Math.max(1,points.length-1)),y=pad.t+plotH*(1-point.analysis.score/100);index?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+      points.forEach((point,index)=>{const x=pad.l+plotW*(index/Math.max(1,points.length-1)),y=pad.t+plotH*(1-point.analysis.score/100),selected=index===state.health.selected;ctx.fillStyle=healthColor(point.analysis.score);ctx.beginPath();ctx.arc(x,y,selected?7:4,0,Math.PI*2);ctx.fill();if(selected){ctx.strokeStyle='#eaf6ff';ctx.lineWidth=2;ctx.stroke()}});
+      const labelIndexes=[0,Math.floor((points.length-1)/2),points.length-1].filter((value,index,array)=>array.indexOf(value)===index);ctx.fillStyle='#71859e';ctx.font='8px system-ui';labelIndexes.forEach((index,labelIndex)=>{const point=points[index],x=pad.l+plotW*(index/Math.max(1,points.length-1)),date=point.file.initialSyncUtc?new Date(point.file.initialSyncUtc*1000).toLocaleDateString(undefined,{month:'short',day:'numeric'}):filename(point.file.path);ctx.textAlign=labelIndex===0?'left':labelIndex===labelIndexes.length-1?'right':'center';ctx.fillText(date,x,height-15)});ctx.textAlign='left';
+      canvas._health={pad,plotW,count:points.length};canvas.onpointerdown=event=>{const chart=canvas._health,box=canvas.getBoundingClientRect(),x=event.clientX-box.left,index=Math.max(0,Math.min(chart.count-1,Math.round((x-chart.pad.l)/chart.plotW*(chart.count-1))));selectHealthPoint(index)}
+    }
+    function selectHealthPoint(index){
+      const points=state.health.points;if(!points.length)return;state.health.selected=Math.max(0,Math.min(points.length-1,Number(index)||0));const point=points[state.health.selected],analysis=point.analysis,signals=analysis.signals;
+      $('healthScrub').value=String(state.health.selected);text('healthPointTitle',filename(point.file.path));text('healthPointCopy',point.file.initialSyncUtc?new Date(point.file.initialSyncUtc*1000).toLocaleString():'Initial sync time unavailable');
+      $('healthPointMeta').innerHTML=`<span>${analysis.score}/100 health</span><span>${analysis.confidence}% confidence</span><span>${analysis.rows} samples</span>${analysis.conditions.map(condition=>`<span>${escapeHtml(condition)}</span>`).join('')}`;
+      text('healthPointMap',`${point.map.label} · ${point.map.source}`);const root=$('healthSignals');root.textContent='';if(!signals.length)root.innerHTML='<div class="health-signal good"><strong>No deterministic threshold alerts</strong><small>This means the channels and conditions present did not cross the current conservative rules; it is not a guarantee that no issue exists.</small></div>';else signals.forEach(signal=>{const card=document.createElement('div');card.className=`health-signal ${signal.severity}`;card.innerHTML=`<strong>${escapeHtml(signal.title)}</strong><small>${escapeHtml(signal.evidence)}</small>`;root.append(card)});
+      $('healthOpenLog').disabled=false;$('healthOpenLog').onclick=()=>openViewer(point.file);text('healthVersion',`vehicle-health-engine v${HEALTH_ENGINE_VERSION} · log ${point.file.sha256.slice(0,12)} · map ${point.map.file?point.map.file.sha256.slice(0,12):'unresolved'}`);renderHealthTimeline()
+    }
+    function renderVehicleHealth(){
+      const points=state.health.points,scrub=$('healthScrub');if(!points.length){renderHealthTimeline();return}const latest=points.at(-1),averageConfidence=Math.round(points.reduce((sum,point)=>sum+point.analysis.confidence,0)/points.length),signalCount=points.reduce((sum,point)=>sum+point.analysis.signals.length,0),mapped=points.filter(point=>point.map.file).length,score=latest.analysis.score;
+      text('healthScore',score);$('healthScoreRing').style.borderColor=healthColor(score);text('healthHeadline',score>=85?'Latest evidence is stable':score>=65?'Latest evidence deserves review':'Latest evidence needs attention');text('healthSummaryCopy',latest.analysis.signals.length?`${latest.analysis.signals.length} deterministic signal${latest.analysis.signals.length===1?'':'s'} in ${filename(latest.file.path)}. Review context before making any repair decision.`:`No current rule threshold was crossed in ${filename(latest.file.path)}.`);
+      text('healthConfidence',`${averageConfidence}%`);text('healthConfidenceCopy',`Average across ${points.length} analyzed log${points.length===1?'':'s'}`);text('healthEvidence',`${points.length} logs`);text('healthEvidenceCopy',`${signalCount} threshold signal${signalCount===1?'':'s'} preserved`);text('healthMaps',`${mapped}/${points.length}`);text('healthMapsCopy','Logs linked to an exact cached map');
+      scrub.disabled=points.length<2;scrub.max=String(Math.max(0,points.length-1));scrub.value=String(state.health.selected);selectHealthPoint(state.health.selected)
+    }
+    function findChannels(terms){const used=new Set(),result=[];for(const term of terms){const lower=term.toLowerCase();for(const channel of state.viewer.data.channels){if(!used.has(channel.index)&&channel.name.toLowerCase().includes(lower)){used.add(channel.index);result.push(channel)}}}return result}
+    function defaultChannels(){const preferred=findChannels(['RPM','Boost','AF Sens','Feedback Knock','Coolant Temp']);return(preferred.length?preferred:state.viewer.data.channels.slice(0,5)).map(channel=>channel.index)}
+    function profiles(){const built=[{name:'Overview',channels:defaultChannels()},{name:'Fueling',channels:findChannels(['RPM','AF Sens','AF Correction','AF Learning']).map(x=>x.index)},{name:'Knock',channels:findChannels(['RPM','Feedback Knock','Fine Knock','DAM']).map(x=>x.index)},{name:'Thermal',channels:findChannels(['Coolant Temp','Intake Temp','Battery']).map(x=>x.index)}];let custom=[];try{custom=JSON.parse(localStorage.getItem('revlink-channel-profiles')||'[]')}catch{}return[...built,...custom].filter(profile=>profile.channels.length)}
+    function renderProfileSelect(){const select=$('profileSelect');select.textContent='';profiles().forEach((profile,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=profile.name;select.append(option)})}
+    function renderChannels(){const root=$('channelChips'),query=$('channelSearch').value.trim().toLowerCase();root.textContent='';state.viewer.data.channels.filter(channel=>!query||channel.name.toLowerCase().includes(query)).forEach(channel=>{const button=document.createElement('button');button.className=`channel${state.channels.includes(channel.index)?' active':''}`;button.innerHTML=`<i class="swatch" style="background:${channel.color}"></i>${escapeHtml(channel.name)}`;button.onclick=()=>{state.channels=state.channels.includes(channel.index)?state.channels.filter(index=>index!==channel.index):[...state.channels,channel.index];if(!state.channels.length)state.channels=[channel.index];document.querySelectorAll('#presetStrip .tab').forEach(node=>node.classList.remove('active'));renderChannels();renderCharts()};root.append(button)})}
+    function escapeHtml(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+    async function openViewer(file){
+      $('viewer').classList.add('open');document.body.style.overflow='hidden';text('viewerName',filename(file.path));text('viewerMeta',`${bytes(file.size)} · ${initialSync(file)}`);$('viewerLoading').hidden=false;$('chartStage').hidden=true;$('channelBrowser').hidden=true;
+      try{const response=await fetchFile(file),csv=await response.text(),data=parseLogCsv(csv);state.viewer={file,data};state.channels=defaultChannels();state.axis='shared';$('axisMode').value='shared';renderProfileSelect();renderChannels();renderPresets();$('viewerLoading').hidden=true;$('chartStage').hidden=false;$('channelBrowser').hidden=false;renderCharts()}catch(error){text('viewerLoading',error.message);if(!connectionError(error))toast(error.message)}
+    }
+    function closeViewer(){$('viewer').classList.remove('open');document.body.style.overflow='';state.viewer=null}
+    function presetChannels(preset){const indexes=[];for(const terms of preset.groups)for(const channel of findChannels(terms))if(!indexes.includes(channel.index))indexes.push(channel.index);return indexes}
+    function applyPreset(preset,button){
+      const indexes=presetChannels(preset);
+      if(!indexes.length){toast(`No ${preset.name} channels were found in this log`);return}
+      document.querySelectorAll('#presetStrip .tab').forEach(node=>node.classList.toggle('active',node===button));
+      state.viewer.preset=preset;
+      if(state.viewerMode==='single'){state.channels=indexes;renderChannels()}
+      renderCharts()
+    }
+    function renderPresets(){
+      const root=$('presetStrip');root.textContent='';
+      PRESETS.forEach(preset=>{const button=document.createElement('button');button.className='tab';button.textContent=preset.name;button.onclick=()=>applyPreset(preset,button);root.append(button)});
+      if(state.viewer){state.viewer.preset=PRESETS[0];const first=root.querySelector('.tab');if(first)applyPreset(PRESETS[0],first)}
+    }
+    function selectedChannels(){return state.viewer.data.channels.filter(channel=>state.channels.includes(channel.index))}
+    function extent(channels){let min=Infinity,max=-Infinity;for(const channel of channels)for(const value of channel.values)if(Number.isFinite(value)){if(value<min)min=value;if(value>max)max=value}if(!Number.isFinite(min))return[0,1];if(min===max){const pad=Math.max(Math.abs(min)*.08,1);return[min-pad,max+pad]}const pad=(max-min)*.08;return[min-pad,max+pad]}
+    function nice(value){if(!Number.isFinite(value))return'—';const abs=Math.abs(value);return abs>=1000?value.toFixed(0):abs>=100?value.toFixed(1):abs>=10?value.toFixed(2):value.toFixed(3)}
+    function channelScaleLabel(channel){const range=extent([channel]),mid=(range[0]+range[1])/2,name=channel.name.replace(/\s*\([^)]*\)\s*$/,'');return`${name}: ${nice(range[0])} / ${nice(mid)} / ${nice(range[1])}`}
+    function draw(canvas,channels,label){
+      const rect=canvas.parentElement.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.max(320,Math.floor(rect.width)),height=Math.max(180,Math.floor(rect.height));canvas.width=width*dpr;canvas.height=height*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,width,height);
+      const dark=matchMedia('(prefers-color-scheme:dark)').matches||!matchMedia('print').matches,perChannel=state.axis==='channel'&&channels.length>1,scaleColumns=perChannel&&width>=620?2:1,scaleRows=perChannel?Math.ceil(channels.length/scaleColumns):0;
+      ctx.fillStyle=dark?'#0b101c':'#fff';ctx.fillRect(0,0,width,height);const pad={l:56,r:18,t:perChannel?46+scaleRows*13:31,b:34},plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
+      const shared=state.axis==='shared'||channels.length===1,sharedExtent=extent(channels);ctx.strokeStyle=dark?'#202b3d':'#d8dce3';ctx.lineWidth=1;ctx.fillStyle=dark?'#758399':'#596273';ctx.font='9px system-ui';
+      for(let i=0;i<=5;i++){const y=pad.t+plotH*i/5;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(width-pad.r,y);ctx.stroke();if(shared){const value=sharedExtent[1]-(sharedExtent[1]-sharedExtent[0])*i/5;ctx.fillText(nice(value),5,y+3)}}
+      for(let i=0;i<=6;i++){const x=pad.l+plotW*i/6;ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,height-pad.b);ctx.stroke()}
+      const count=Math.max(...channels.map(channel=>channel.values.length),1),time=state.viewer.data.time;for(const channel of channels){const range=shared?sharedExtent:extent([channel]),values=channel.values,step=Math.max(1,Math.ceil(values.length/Math.max(plotW*1.4,800)));ctx.strokeStyle=channel.color;ctx.lineWidth=1.4;ctx.beginPath();let started=false;for(let index=0;index<values.length;index+=step){const value=values[index];if(!Number.isFinite(value))continue;const x=pad.l+plotW*(index/Math.max(1,count-1)),y=pad.t+plotH*(1-(value-range[0])/(range[1]-range[0]));if(!started){ctx.moveTo(x,y);started=true}else ctx.lineTo(x,y)}ctx.stroke()}
+      ctx.fillStyle=dark?'#aab7ca':'#343b47';ctx.font='bold 9px system-ui';ctx.fillText(label||channels.map(x=>x.name).join(' · '),pad.l,15);
+      if(perChannel){ctx.fillStyle=dark?'#758399':'#596273';ctx.font='bold 8px system-ui';ctx.fillText('PER-CHANNEL SCALE · LOW / MID / HIGH',pad.l,29);const cellWidth=plotW/scaleColumns;channels.forEach((channel,index)=>{const column=Math.floor(index/scaleRows),row=index%scaleRows,x=pad.l+column*cellWidth,y=43+row*13;ctx.fillStyle=channel.color;ctx.beginPath();ctx.arc(x+3,y-3,3,0,Math.PI*2);ctx.fill();ctx.font='8px system-ui';ctx.fillText(channelScaleLabel(channel),x+11,y)})}
+      ctx.font='9px system-ui';ctx.fillStyle=dark?'#758399':'#596273';for(let i=0;i<=6;i++){const ratio=i/6,index=Math.min(count-1,Math.round((count-1)*ratio)),raw=time?.values[index],value=Number.isFinite(raw)?raw:index,x=pad.l+plotW*ratio;ctx.textAlign=i===0?'left':i===6?'right':'center';ctx.fillText(`${nice(value)}${i===6?(time?' sec':' samples'):''}`,x,height-11)}ctx.textAlign='left';
+      canvas._chart={channels,pad,plotW,plotH,count,shared,sharedExtent,width,height}
+    }
+    function attachTooltip(canvas){canvas.onpointermove=event=>{if(!state.viewer||!canvas._chart)return;const chart=canvas._chart,rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,index=Math.max(0,Math.min(chart.count-1,Math.round((x-chart.pad.l)/chart.plotW*(chart.count-1))));const tip=$('tooltip'),time=state.viewer.data.time?.values[index];tip.innerHTML=`<b>${Number.isFinite(time)?nice(time)+' sec':'Sample '+index}</b>`+chart.channels.map(channel=>`<div><span><i class="swatch" style="background:${channel.color}"></i>${escapeHtml(channel.name)}</span><strong>${nice(channel.values[index])}</strong></div>`).join('');tip.style.left=`${Math.min(innerWidth-275,event.clientX+14)}px`;tip.style.top=`${Math.min(innerHeight-150,event.clientY+14)}px`;tip.classList.add('show')};canvas.onpointerleave=()=>$('tooltip').classList.remove('show')}
+    function renderCharts(){
+      if(!state.viewer)return;const single=state.viewerMode==='single';$('singleChart').hidden=!single;$('splitGrid').hidden=single;$('axisMode').disabled=!single;$('profileSelect').disabled=!single;$('saveProfile').disabled=!single;
+      if(single){const canvas=$('singleChart').querySelector('canvas'),channels=selectedChannels();draw(canvas,channels,'Selected channels');attachTooltip(canvas)}
+      else{const root=$('splitGrid');root.textContent='';const preset=state.viewer.preset||PRESETS[0];for(const terms of preset.groups){const channels=findChannels(terms);if(!channels.length)continue;const card=document.createElement('div');card.className='split-card';const canvas=document.createElement('canvas');card.append(canvas);root.append(card);draw(canvas,channels,channels.map(x=>x.name).join(' · '));attachTooltip(canvas)}if(!root.children.length)root.innerHTML='<div class="empty">This log does not contain channels for the selected preset.</div>'}
+    }
+    function saveProfile(){const name=prompt('Profile name');if(!name?.trim())return;let custom=[];try{custom=JSON.parse(localStorage.getItem('revlink-channel-profiles')||'[]')}catch{}custom.push({name:name.trim().slice(0,32),channels:[...state.channels]});localStorage.setItem('revlink-channel-profiles',JSON.stringify(custom.slice(-12)));renderProfileSelect();$('profileSelect').value=String(profiles().length-1);toast('Channel profile saved on this browser')}
+    async function offerClientTime(){const utc=Math.floor(Date.now()/1000);if(!Number.isSafeInteger(utc)||utc<1577836800||utc>4102444800)return;try{await jsonRequest('/api/portal/time',{method:'POST',headers:{...portalHeader,'Content-Type':'application/x-www-form-urlencoded'},body:`utc=${utc}`})}catch{}}
+    document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>showView(button.dataset.view));
+    document.querySelectorAll('[data-sync-button]').forEach(button=>button.onclick=()=>action('/api/portal/sync'));document.querySelectorAll('[data-cancel-button]').forEach(button=>button.onclick=()=>action('/api/portal/sync/cancel'));document.querySelectorAll('[data-auto-sync]').forEach(input=>input.onchange=event=>setAutoSync(event.target.checked));$('autoSyncSettings').onchange=event=>setAutoSync(event.target.checked);
+    $('logSearch').oninput=$('logSort').onchange=$('mapSearch').oninput=$('mapSort').onchange=renderCollections;document.querySelectorAll('[data-clear-selection]').forEach(button=>button.onclick=()=>{state.selected.clear();renderCollections()});$('downloadLogs').onclick=()=>downloadSelected('datalog');$('emailLogs').onclick=emailSelectedLogs;$('downloadMaps').onclick=()=>downloadSelected('map');
+    $('mapUploadFile').onchange=event=>{const file=event.target.files[0];if(file)$('mapUploadName').value=file.name;updateMapTransferButton()};$('mapUploadName').oninput=updateMapTransferButton;$('applyMap').onclick=applyMap;$('writeConsent').onchange=event=>setWriteConsent(event.target.checked);
+    $('downloadBackup').onclick=downloadBackup;$('chooseRestore').onclick=()=>$('backupRestoreFile').click();$('backupRestoreFile').onchange=event=>previewRestore(event.target.files[0]);$('applyRestore').onclick=applyRestore;
+    $('addStartupProfile').onclick=openStartupEditor;$('closeStartupEditor').onclick=closeStartupEditor;$('cancelStartupEditor').onclick=closeStartupEditor;$('saveStartupProfile').onclick=saveStartupImageProfile;
+    $('startupImageFile').onchange=event=>{const file=event.target.files[0];if(!file)return;if(state.startupImageUrl)URL.revokeObjectURL(state.startupImageUrl);const url=URL.createObjectURL(file),image=new Image();state.startupImageUrl=url;image.onload=()=>{state.startupImage=image;$('startupProfileName').value=filename(file.name).replace(/\.[^.]+$/,'').slice(0,80);$('saveStartupProfile').disabled=false;renderStartupCrop()};image.onerror=()=>{if(state.startupImageUrl===url){URL.revokeObjectURL(url);state.startupImageUrl=null}state.startupImage=null;$('saveStartupProfile').disabled=true;toast('This image could not be opened. Try a PNG or JPEG file.')};image.src=url};
+    ['startupZoom','startupPositionX','startupPositionY'].forEach(id=>$(id).oninput=renderStartupCrop);
+    $('startupEditor').onclick=event=>{if(event.target===$('startupEditor'))closeStartupEditor()};$('closeScreenshotViewer').onclick=closeScreenshot;$('screenshotViewer').onclick=event=>{if(event.target===$('screenshotViewer'))closeScreenshot()};
+    $('closeMapViewer').onclick=$('mapDetailClose').onclick=closeMapDetails;$('mapDetailDownload').onclick=()=>state.mapDetailFile&&downloadFile(state.mapDetailFile);$('mapViewer').onclick=event=>{if(event.target===$('mapViewer'))closeMapDetails()};
+    $('closeDownloadTray').onclick=$('downloadTrayDone').onclick=closeDownloadTray;$('downloadTray').onclick=event=>{if(event.target===$('downloadTray'))closeDownloadTray()};
+    $('moreButton').onclick=()=> $('moreSheet').classList.toggle('open');$('closeMore').onclick=()=> $('moreSheet').classList.remove('open');$('closeViewer').onclick=closeViewer;
+    $('runHealth').onclick=runVehicleHealth;$('healthScrub').oninput=event=>selectHealthPoint(event.target.value);
+    $('retryConnection').onclick=()=>attemptReconnect({manual:true});$('refreshConnection').onclick=()=>location.reload();
+    $('datasetSelect').onchange=event=>selectCachedDevice(event.target.value);
+    document.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>{state.viewerMode=button.dataset.mode;if(state.viewerMode==='single'&&state.viewer?.preset){const indexes=presetChannels(state.viewer.preset);if(indexes.length){state.channels=indexes;renderChannels()}}document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('active',x===button));renderCharts()});
+    $('axisMode').onchange=event=>{state.axis=event.target.value;renderCharts()};$('channelSearch').oninput=renderChannels;$('profileSelect').onchange=event=>{const profile=profiles()[Number(event.target.value)];if(profile){state.channels=[...profile.channels];document.querySelectorAll('#presetStrip .tab').forEach(node=>node.classList.remove('active'));renderChannels();renderCharts()}};$('saveProfile').onclick=saveProfile;$('viewerDownload').onclick=()=>state.viewer&&downloadFile(state.viewer.file);$('viewerPrint').onclick=()=>print();
+    addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{renderCharts();renderHealthTimeline()},120)});addEventListener('keydown',event=>{if(event.key==='Escape'&&state.viewer)closeViewer()});
+    addEventListener('online',()=>{if(connection.offline)attemptReconnect({manual:true})});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!connection.offline)loadStatus()});
+    offerClientTime();showView(location.hash.slice(1)||'dashboard');loadStatus();loadDevices();loadFiles();setInterval(loadStatus,2500);
+  </script>
+</body>
+</html>

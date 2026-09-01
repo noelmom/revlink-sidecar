@@ -1,0 +1,12 @@
+## ESP-IDF Component Manager manifest
+dependencies:
+  espressif/usb:
+    version: "^1.0.0"
+  espressif/esp_wifi_remote:
+    version: ">=0.10,<2.0"
+  espressif/esp_hosted:
+    version: "~2"
+  espressif/mdns:
+    version: "^1.0.3"
+  espressif/qrcode:
+    version: "^0.2.0"
