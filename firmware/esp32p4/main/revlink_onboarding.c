@@ -1120,7 +1120,23 @@ esp_err_t revlink_onboarding_start(void)
      * not make an otherwise healthy Sidecar fail to start.
      */
     configuration.max_uri_handlers = 48U;
-    configuration.stack_size = 6144U;
+    /*
+     * One listener serves the onboarding routes and every portal route, so
+     * this stack has to cover the deepest handler, not the shallowest. The
+     * portal streams cached files through FatFS and parses request bodies in
+     * stack buffers — the note handler alone reserves 2600 bytes — on top of
+     * httpd's own header parsing.
+     *
+     * At 6144 that overflowed: the board panicked with a stack protection
+     * fault whose corrupted task name was the text of an Accept- header,
+     * because the overrun walked into the task control block.
+     *
+     * Measured under 720 browser-shaped requests, the deepest this task goes
+     * is about 6116 bytes — twenty-eight bytes inside the old size, which is
+     * why it survived light use and died under a real browser. Handlers log
+     * the remaining headroom as it reaches new lows; see send_json().
+     */
+    configuration.stack_size = 12288U;
     configuration.lru_purge_enable = true;
     configuration.uri_match_fn = httpd_uri_match_wildcard;
     status = httpd_start(&onboarding_server, &configuration);

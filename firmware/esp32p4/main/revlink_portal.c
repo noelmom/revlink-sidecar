@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include "esp_app_desc.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "revlink_accessport_catalog.h"
 #include "revlink_backup.h"
 #include "revlink_control_service.h"
@@ -111,12 +114,31 @@ void revlink_portal_configure_time_observer(
     portal_time_observer = observer;
 }
 
+static const char *TAG = "revlink_portal";
+
+/*
+ * Handlers run on the HTTP server task, so this measures the deepest that
+ * task has been. Reported only when it reaches a new low, so a healthy
+ * Sidecar stays quiet and a shrinking margin is visible before it becomes a
+ * stack protection fault. ESP-IDF returns bytes here, not words.
+ */
+static void report_http_stack_headroom(void)
+{
+    static UBaseType_t lowest = (UBaseType_t)-1;
+    const UBaseType_t headroom = uxTaskGetStackHighWaterMark(NULL);
+    if (headroom < lowest) {
+        lowest = headroom;
+        ESP_LOGI(TAG, "http task stack: %u bytes free", (unsigned int)headroom);
+    }
+}
+
 static esp_err_t send_json(
     httpd_req_t *request,
     const char *status,
     const char *json
 )
 {
+    report_http_stack_headroom();
     httpd_resp_set_status(request, status);
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
