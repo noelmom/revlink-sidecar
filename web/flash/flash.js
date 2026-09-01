@@ -221,6 +221,17 @@ function describe(error) {
       "(a serial monitor, idf.py monitor, Arduino IDE) and try again."
     );
   }
+  if (/Failed to write compressed data|Failed to write to target Flash/i.test(
+        message
+      )) {
+    return (
+      "The write stopped partway. This is almost always the serial link " +
+      "running faster than the board's USB bridge can keep up with, not a " +
+      "problem with the board. Pick a lower transfer speed and press Flash " +
+      "again — you do not need to reconnect, and a half-written board is not " +
+      "a broken one."
+    );
+  }
   if (/Timed out waiting for packet header|Failed to connect/i.test(message)) {
     return (
       "The board did not answer. Hold BOOT, tap RST, release BOOT to enter " +
@@ -239,8 +250,15 @@ async function flash() {
 
   try {
     const fileArray = await fetchParts();
-    const total = fileArray.reduce((n, f) => n + f.data.length, 0);
-    const done = new Array(fileArray.length).fill(0);
+    /*
+     * With compression on, esptool reports bytes of the *compressed* stream,
+     * whose size is not known until it starts each part. Track each part's
+     * own completion fraction and weight it by uncompressed size, so the bar
+     * means the same thing whether or not a part compresses well.
+     */
+    const weights = fileArray.map((f) => f.data.length);
+    const weightTotal = weights.reduce((a, b) => a + b, 0);
+    const fraction = new Array(fileArray.length).fill(0);
 
     status("Writing flash — do not unplug the board.");
     await esploader.writeFlash({
@@ -250,10 +268,13 @@ async function flash() {
       flashFreq: manifest.flash.frequency,
       eraseAll: false,
       compress: true,
-      reportProgress: (index, written) => {
-        done[index] = written;
-        const sum = done.reduce((a, b) => a + b, 0);
-        const pct = Math.min(100, Math.round((sum / total) * 100));
+      reportProgress: (index, written, fileTotal) => {
+        fraction[index] = fileTotal > 0 ? Math.min(1, written / fileTotal) : 0;
+        const weighted = fraction.reduce(
+          (sum, f, i) => sum + f * weights[i],
+          0
+        );
+        const pct = Math.min(100, Math.round((weighted / weightTotal) * 100));
         ui.bar.style.width = pct + "%";
         ui.bar.textContent = pct + "%";
       },
