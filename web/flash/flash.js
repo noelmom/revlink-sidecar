@@ -110,13 +110,14 @@ async function fetchParts() {
     }
     log(`verified ${part.path} (${part.size} bytes)`);
 
-    // esptool-js takes a latin1 "binary string", not an ArrayBuffer.
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    }
-    parts.push({ data: binary, address: part.offset });
+    /*
+     * esptool-js takes a Uint8Array. Handing it a latin1 "binary string" —
+     * the pre-0.5 convention — makes the deflate step encode it as UTF-8, so
+     * every byte above 0x7F becomes two and the device is sent a stream
+     * larger than the image. That fails at the same block on every attempt,
+     * at any baud rate, which looks convincingly like a flaky serial link.
+     */
+    parts.push({ data: new Uint8Array(buffer), address: part.offset });
   }
   return parts;
 }
@@ -226,12 +227,12 @@ function describe(error) {
         message
       )) {
     return (
-      "The write stopped partway. The board is fine — this is the loader " +
-      "not getting an answer in time, usually because it is erasing as it " +
-      "writes. Tick \u201cErase the whole flash first\u201d and press Flash " +
-      "again; if it still stops at the same point, drop the transfer speed " +
-      "too. You do not need to reconnect, and a half-written board is not a " +
-      "broken one."
+      "The write stopped partway. Your board is almost certainly fine — a " +
+      "half-written board is not a broken one, because the bootloader lives " +
+      "in ROM. Press Flash to try again; you do not need to reconnect. If it " +
+      "stops at the same point every time, drop the transfer speed, and if " +
+      "that does not help, tick \u201cErase the whole flash first\u201d. " +
+      "Please report it with the log below."
     );
   }
   if (/Timed out waiting for packet header|Failed to connect/i.test(message)) {
@@ -275,7 +276,7 @@ async function flash() {
        * — which surfaces as a short reply and a failed block, always at the
        * same place regardless of transfer speed.
        */
-      eraseAll: ui.erase?.checked !== false,
+      eraseAll: ui.erase?.checked === true,
       compress: true,
       reportProgress: (index, written, fileTotal) => {
         fraction[index] = fileTotal > 0 ? Math.min(1, written / fileTotal) : 0;
