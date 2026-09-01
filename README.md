@@ -168,6 +168,7 @@ docs/               Architecture, safety model, networking, storage, bring-up
 | [PRODUCT_NETWORKING.md](docs/PRODUCT_NETWORKING.md) | Client-first Wi-Fi with fallback hotspot and captive portal |
 | [ACCESSPORT_STORAGE_BEHAVIOR.md](docs/ACCESSPORT_STORAGE_BEHAVIOR.md) | How the device's filesystem actually behaves |
 | [SUPPORTED_ACCESSPORTS.md](docs/SUPPORTED_ACCESSPORTS.md) | Which hardware is verified, and how families are identified |
+| [ACCESSPORT_CATALOG.md](docs/ACCESSPORT_CATALOG.md) | The part-number table: what it is, where it comes from, how to add to it |
 | [VEHICLE_HEALTH.md](docs/VEHICLE_HEALTH.md) | The deterministic diagnostic layer |
 | [SIDECAR_SD_BACKUP.md](docs/SIDECAR_SD_BACKUP.md) | Backing up and restoring the card |
 

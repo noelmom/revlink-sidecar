@@ -71,18 +71,20 @@ Filename-only matches must never override an exact hash. A reused filename or
 multiple cached versions stays ambiguous until the user selects the correct
 map.
 
-The existing public `.ptm` reader provides description, declared vehicle
-compatibility, vendor/version, identifiers, checksums, lock metadata, and
-feature declarations. A true tuning delta requires private-map decoding and a
-verified stock baseline. That work belongs behind an isolated map-intelligence
-interface and must not be mixed into USB, sync, or portal code.
+The `.ptm` reader uses only the header fields a map file declares about
+itself in the clear: description, declared vehicle compatibility,
+vendor/version, identifiers, checksums, and feature declarations. That is
+enough to tell you which map a datalog came from, which is what Vehicle Health
+needs.
 
-The first read-only baseline candidate is the installed vehicle's
-`../ap-data/user.rom`, as documented by the reviewed `projectportaccess`
-research. Before it becomes part of normal synchronization it needs a
-hardware-accepted, exact-path probe, a strict size limit, SHA-256 object
-storage, and an explicit storage kind. Generic parent-directory traversal is
-not permitted.
+It stops there deliberately. **RevLink Sidecar does not decode protected or
+vendor-locked map content.** Tuners protect maps on purpose — it is how many
+of them make a living — and reading the metadata a file publishes about itself
+is a different thing from defeating that protection.
+
+A numeric "tuning delta" against a stock baseline is therefore out of scope.
+It would require exactly the decoding this project declines to do, and it
+would mean reading calibration data off the vehicle. Neither is a goal.
 
 ## Resource model
 
@@ -103,12 +105,10 @@ same versioned result schema on microSD.
 Heavy operations stay modular:
 
 - CSV evaluation can run locally in the browser;
-- private map decoding can run in an isolated local worker or future cloud
-  service;
 - PDF rendering remains an export adapter, not part of the scoring engine; and
 - AI consumes deterministic evidence but cannot replace it.
 
-This prevents optional PDF, cloud, map-diff, or AI features from consuming
+This prevents optional PDF, cloud, or AI features from consuming
 always-resident firmware memory or blocking USB synchronization.
 
 ## Safety and acceptance

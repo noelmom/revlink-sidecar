@@ -42,15 +42,47 @@ and software this project interoperates with. No claim is made to any of
 them, and no endorsement is implied.
 
 --------------------------------------------------------------------------
-Interoperability
+Interoperability and scope
 --------------------------------------------------------------------------
 
-The AccessPort file-transfer protocol implemented here was determined by
-observing USB traffic between an AccessPort and its own host software, for the
-sole purpose of interoperating with hardware the user already owns. This
-project contains no COBB source code, firmware, calibration data, or map
-content, and it does not modify, redistribute, or circumvent any COBB
-software.
+RevLink Sidecar exists to solve one problem: an AccessPort stores your
+datalogs and maps over USB, but it only talks to a Windows PC or a Mac. This
+project lets the owner of an AccessPort reach their own files from a phone,
+without a laptop. It is a companion to that hardware, not a replacement for
+it, and not a competitor to any vendor's tuning products or services.
 
-This project reads and writes files. It does not flash ECUs, does not perform
-real-time tuning, and does not interpret or generate calibration data.
+The file-transfer protocol implemented here was determined by observing USB
+traffic between an AccessPort and its own host software, on hardware owned by
+the author, for the sole purpose of interoperating with that hardware.
+
+What this project does NOT contain and does NOT do:
+
+  * It contains no COBB source code, firmware, calibration data, map content,
+    vehicle definitions, or other protected material. The part-number table in
+    firmware/components/accessport_catalog is a list of publicly published
+    product identifiers and the car brand each is sold for; see
+    docs/ACCESSPORT_CATALOG.md.
+
+  * It does not decode, unlock, or convert protected or vendor-locked map
+    formats, and there is no plan to. Tuners protect maps deliberately, and
+    this project reads only the metadata a map file publishes about itself.
+
+  * It does not flash ECUs, perform real-time tuning, or interpret or generate
+    calibration data. Those are permanently out of scope.
+
+  * It does not modify, patch, redistribute, emulate, or circumvent any vendor
+    software, licensing, device activation, or vehicle marrying/unmarrying
+    process.
+
+  * It does not extract calibration data from a vehicle.
+
+  * It reads and writes ordinary files on hardware the user already owns.
+    Writing is compiled out of published images entirely; see SAFETY.md.
+
+Modifying a vehicle may affect its warranty, emissions compliance, and legal
+road status. Using this software is the user's own responsibility, and it is
+provided without warranty of any kind.
+
+If you represent a rights holder and believe something here oversteps, please
+open an issue or contact the maintainer through GitHub. Concerns raised in
+good faith will get a prompt and serious response.

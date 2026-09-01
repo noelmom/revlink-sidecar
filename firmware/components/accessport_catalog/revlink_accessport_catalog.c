@@ -37,9 +37,14 @@ static const family_description_t FAMILIES[] = {
 };
 
 /*
- * Generated from projectportaccess data/catalog/vehicles.json at commit
- * 3025179546a1faee0d81aa11c5bf481843bd60e2. The table is sorted so lookup
- * stays bounded and allocation-free on the product firmware.
+ * Published AccessPort part numbers mapped to the vehicle family each is sold
+ * for. Assembled by hand from vendor-published product identifiers and
+ * reviewed entry by entry; see docs/ACCESSPORT_CATALOG.md.
+ *
+ * Contains no vendor software, firmware, calibration, or map content.
+ *
+ * The table is sorted by part number so lookup stays bounded and
+ * allocation-free on the product firmware.
  */
 static const part_record_t PARTS[] = {
     {"AP3-APA-001", REVLINK_ACCESSPORT_FAMILY_ACTIVATION},

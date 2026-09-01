@@ -5,14 +5,12 @@ the authoritative, read-only identity handshake. The product firmware contains
 a bounded catalog of 64 reviewed parts across 12 families. It does not infer a
 specific vehicle from a part-number prefix or from USB VID/PID alone.
 
-Catalog provenance:
+The table is assembled from vendor-published product identifiers and contains
+no vendor software, firmware, calibration, or map content. Its contents,
+provenance, and update procedure are documented in
+[`ACCESSPORT_CATALOG.md`](ACCESSPORT_CATALOG.md).
 
-- source: a separate private catalog project (not published)
-- source revision: `3025179546a1faee0d81aa11c5bf481843bd60e2`
-- source file: `data/catalog/vehicles.json`
-- source SHA-256:
-  `986c2cbd3979fd4a9e2f153e371b2af419e8bece144152e96b97db15667df27c`
-- firmware catalog revision: `projectportaccess-2026-07-28`
+- firmware catalog revision: `revlink-catalog-2026-07-28`
 
 ## Safety model
 
@@ -57,12 +55,12 @@ the USB transport or silently granting unrelated features.
 
 Treat a catalog update as a safety-policy change:
 
-1. update `projectportaccess` evidence first;
-2. record its source revision and catalog hash here;
-3. add exact parts to `revlink_accessport_catalog.c`;
-4. keep the table uniquely sorted;
-5. update `REVLINK_ACCESSPORT_CATALOG_REVISION` and the expected count;
-6. run the host catalog test, complete local CI, and an identity-only hardware
+1. confirm the exact part number as published by the vendor — never a guess
+   from a prefix and never an extrapolated range;
+2. add exact parts to `revlink_accessport_catalog.c`;
+3. keep the table uniquely sorted;
+4. update `REVLINK_ACCESSPORT_CATALOG_REVISION` and the expected count;
+5. run the host catalog test, complete local CI, and an identity-only hardware
    check before enabling sync for the new part.
 
 Do not add wildcard matching. Do not equate a family with a specific vehicle.

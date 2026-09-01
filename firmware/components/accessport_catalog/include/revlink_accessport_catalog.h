@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define REVLINK_ACCESSPORT_CATALOG_REVISION "projectportaccess-2026-07-28"
+#define REVLINK_ACCESSPORT_CATALOG_REVISION "revlink-catalog-2026-07-28"
 #define REVLINK_ACCESSPORT_CATALOG_PART_COUNT 64U
 
 typedef enum {

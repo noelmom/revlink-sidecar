@@ -215,8 +215,9 @@ different radio from destabilizing proven file synchronization.
 ### Supported-device classification
 
 The exact supported-part catalog is isolated in `accessport_catalog`. It is
-derived from the reviewed `projectportaccess` vehicle catalog and contains 64
-part numbers across 12 protocol families. USB eligibility, authoritative
+assembled from vendor-published product identifiers and contains 64 part
+numbers across 12 protocol families; see
+[`ACCESSPORT_CATALOG.md`](ACCESSPORT_CATALOG.md). USB eligibility, authoritative
 device identity, reviewed part support, and feature capability remain separate
 decisions:
 
