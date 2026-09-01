@@ -74,17 +74,24 @@ An AccessPort never overwrites a map, and it refuses a destination it already
 holds at the readiness step — after a transfer has started. Left alone that
 surfaces as a generic failure for something that could never have worked.
 
-Staging therefore checks the cached inventory first and refuses the name up
-front:
+Staging decides instead, once the payload is committed and its digest is
+known. Comparing digests rather than names matters, because the two cases are
+not the same thing:
 
-```
-409  This AccessPort already has a map with that name. Existing maps are
-     never overwritten — rename the file and save it again.
-```
+| Name | Bytes | Result |
+| --- | --- | --- |
+| new | — | `200` staged and pinned |
+| exists | identical | `200 {"alreadyPresent":true}` — nothing staged, nothing to do |
+| exists | different | `409` refused; rename and save again |
 
-The cache mirrors the device after a sync, so this is a pre-flight, not the
-authority. If it cannot be read, staging proceeds and the device decides, as
-it did before.
+Same name and same bytes is a no-op, not a conflict: the device already holds
+exactly that file. Same name with different bytes is a real conflict and is
+worth stopping, because the transfer would be refused anyway and the map you
+meant to send would never arrive.
+
+The cached inventory mirrors the device after a sync, so this is a pre-flight
+rather than the authority. If it cannot be read the payload stays staged and
+the device decides, as it did before.
 
 ## After a transfer
 

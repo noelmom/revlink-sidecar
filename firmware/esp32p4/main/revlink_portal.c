@@ -2006,7 +2006,10 @@ static bool portal_selected_device_identity(
  * pre-flight. It is not the authority: if it cannot be read, say nothing and
  * let the device decide, exactly as before.
  */
-static bool portal_destination_already_present(const char *destination)
+static bool portal_cached_destination_digest(
+    const char *destination,
+    uint8_t digest[REVLINK_SYNC_ANNOTATION_SHA256_BYTES]
+)
 {
     revlink_sd_portal_snapshot_t *snapshot = calloc(1U, sizeof(*snapshot));
     if (snapshot == NULL) return false;
@@ -2014,6 +2017,11 @@ static bool portal_destination_already_present(const char *destination)
     if (revlink_sd_portal_snapshot(snapshot) == ESP_OK) {
         for (size_t index = 0U; index < snapshot->listed_files; ++index) {
             if (strcmp(snapshot->files[index].path, destination) == 0) {
+                memcpy(
+                    digest,
+                    snapshot->files[index].sha256,
+                    REVLINK_SYNC_ANNOTATION_SHA256_BYTES
+                );
                 present = true;
                 break;
             }
@@ -2068,16 +2076,6 @@ static esp_err_t portal_map_stage_handler(httpd_req_t *request)
             "{\"error\":\"Use a .ptm file name without a folder\"}"
         );
     }
-    if (portal_destination_already_present(destination)) {
-        return send_json(
-            request,
-            "409 Conflict",
-            "{\"error\":\"This AccessPort already has a map with that name. "
-            "Existing maps are never overwritten \u2014 rename the file and "
-            "save it again.\"}"
-        );
-    }
-
     esp_err_t status = revlink_map_upload_stage_begin(
         name,
         destination,
@@ -2149,6 +2147,45 @@ static esp_err_t portal_map_stage_handler(httpd_req_t *request)
             "{\"error\":\"Unable to commit staged map\"}"
         );
     }
+    /*
+     * The AccessPort never overwrites a map, and refuses a name it already
+     * holds at the readiness step — after a transfer has started. Decide here
+     * instead, now that the payload is committed and its digest is known.
+     *
+     * Same name and same bytes is not a conflict, it is a no-op: the device
+     * already has exactly this file. Say so and drop the payload rather than
+     * leaving something staged that would fail. Same name with different bytes
+     * is a real conflict and is refused.
+     *
+     * The cached inventory mirrors the device after a sync, so this is a
+     * pre-flight rather than the authority. If it cannot be read the payload
+     * stays staged and the device decides, as it did before.
+     */
+    revlink_map_upload_snapshot_t staged = {0};
+    uint8_t cached_digest[REVLINK_SYNC_ANNOTATION_SHA256_BYTES] = {0};
+    if (revlink_map_upload_snapshot(&staged) == ESP_OK
+        && portal_cached_destination_digest(destination, cached_digest)) {
+        const bool identical = memcmp(
+            staged.sha256,
+            cached_digest,
+            sizeof(cached_digest)
+        ) == 0;
+        (void)revlink_map_upload_discard();
+        return identical
+            ? send_json(
+                  request,
+                  HTTPD_200,
+                  "{\"ok\":true,\"staged\":false,\"alreadyPresent\":true}"
+              )
+            : send_json(
+                  request,
+                  "409 Conflict",
+                  "{\"error\":\"This AccessPort already has a different map "
+                  "with that name. Existing maps are never overwritten "
+                  "\u2014 rename the file and save it again.\"}"
+              );
+    }
+
     char body[192];
     (void)snprintf(
         body,

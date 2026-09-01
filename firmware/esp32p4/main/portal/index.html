@@ -962,8 +962,14 @@
       button.disabled=true;
       try{
         text('mapUploadStatus',`Saving ${name} to the Sidecar\u2026`);
-        await jsonRequest('/api/portal/maps/stage',{method:'POST',timeoutMs:120000,headers:{...portalHeader,'Content-Type':'application/octet-stream','X-RevLink-Map-Name':name},body:file});
+        const result=await jsonRequest('/api/portal/maps/stage',{method:'POST',timeoutMs:120000,headers:{...portalHeader,'Content-Type':'application/octet-stream','X-RevLink-Map-Name':name},body:file});
         await loadStatus();
+        if(result?.alreadyPresent){
+          // Same name, same bytes: the AccessPort already has this exact file.
+          text('mapUploadStatus',`${name} is already on this AccessPort, byte for byte. Nothing to transfer.`);
+          toast('Already on the AccessPort');
+          return
+        }
         const upload=state.status?.mapUpload||{};
         toast(upload.pinned?`Saved for ${upload.target}`:'Saved, but not tied to a device');
       }catch(error){if(!connectionError(error))toast(error.message);await loadStatus()}
