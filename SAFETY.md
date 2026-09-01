@@ -99,6 +99,9 @@ Claims here are limited to what has been verified on a real device.
 - A map staged with no AccessPort attached, surviving a power cycle: restored
   at boot with its recorded size and SHA-256 re-verified, and still pinned to
   the part number it was saved for
+- A staged map applied automatically, with nobody pressing anything: written
+  after a clean sync to the AccessPort it was pinned to, and verified by
+  read-back (`MAP WRITE VERIFIED ... ready/completion/readback=passed`)
 - Writing a map to an AccessPort. On the first live pass the device accepted
   the file and a later read-only session recovered the exact bytes and digest.
   That pass reported a misleading `ESP_ERR_INVALID_CRC` only because the local
@@ -108,10 +111,6 @@ Claims here are limited to what has been verified on a real device.
 
 **Not yet accepted on hardware:**
 
-- RevLink starting a write on its own. Automatic application of a staged map
-  fires after a sync with nobody pressing anything, and that trigger has only
-  been exercised in host tests. The write it performs is the accepted one
-  above; what is new is the decision to perform it
 - The full ceremonial round-trip in docs/MAP_WRITE_ACCEPTANCE.md — listing
   before and after, and the delete step — has not been completed end to end
 - Startup-screen replacement against a device

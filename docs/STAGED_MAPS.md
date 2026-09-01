@@ -93,10 +93,12 @@ enabled=true
 The preference persists in NVS. Portal status reports `autoApply`, `pinned`,
 and `targetPartNumber` under `mapUpload`.
 
-> [!IMPORTANT]
-> Writing a map to an AccessPort is a proven path — see
-> [`MAP_WRITE_ACCEPTANCE.md`](MAP_WRITE_ACCEPTANCE.md). What is new here is the
-> Sidecar deciding to perform one unattended, after a sync, with nobody
-> pressing anything. That trigger has been exercised only in host tests.
-> Staging, persistence across a power cycle, and the device pin have been
-> accepted on hardware.
+> [!NOTE]
+> Accepted on hardware. A map staged with no AccessPort attached survived a
+> power cycle, was applied automatically after the next clean sync with nobody
+> pressing anything, and the transfer was verified by read-back:
+>
+> ```
+> Applying staged map 'maps/<name>.ptm' to pinned AccessPort part=AP3-SUB-004
+> MAP WRITE VERIFIED: bytes=58885 ready/completion/readback=passed
+> ```

@@ -63,6 +63,12 @@ static atomic_bool close_recovery_failure_seen = ATOMIC_VAR_INIT(false);
 #endif
 static atomic_bool usb_link_recovery_scheduled = ATOMIC_VAR_INIT(false);
 static void usb_link_recovery_task(void *context);
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+/* Set when a clean sync finishes with a staged map worth applying, and
+ * consumed once the device returns to AVAILABLE after its post-sync
+ * re-enumeration. */
+static atomic_bool auto_apply_after_sync = ATOMIC_VAR_INIT(false);
+#endif
 static atomic_bool auto_sync_retry_scheduled = ATOMIC_VAR_INIT(false);
 static atomic_uint auto_sync_retry_generation = ATOMIC_VAR_INIT(0U);
 static void auto_sync_retry_task(void *context);
@@ -493,37 +499,19 @@ static void handle_sync_event(
     /*
      * A staged map is written only once the read-only inventory is fully
      * synchronized: after a clean acknowledged close, with nothing pending,
-     * and with no continuation batch queued. Every remaining gate — owner
-     * consent, the auto-apply preference, and the pinned AccessPort identity
-     * — is evaluated inside the write service.
+     * and with no continuation batch queued.
+     *
+     * Do not start the write here. A clean sync ends with a polite session
+     * close, and that close triggers a software re-enumeration; for the
+     * moment it takes, the transport holds no eligible device handle and
+     * refuses the write outright with ESP_ERR_INVALID_STATE. Record the
+     * intent instead and let the device tell us when it is ready again.
      */
     if (status == REVLINK_SYNC_OK
         && event->kind == REVLINK_SYNC_EVENT_COMPLETED
         && !continuation_needed
         && !atomic_load(&shutdown_requested)) {
-        bool identified = false;
-        revlink_ap_device_info_t attached = {0};
-        if (revlink_runtime_connected_accessport_snapshot(
-                &identified,
-                &attached
-            ) == ESP_OK
-            && identified) {
-            revlink_staged_map_apply_decision_t decision =
-                REVLINK_STAGED_MAP_APPLY_NOTHING_STAGED;
-            const esp_err_t applied = revlink_map_upload_auto_apply(
-                &attached,
-                event->data_phase_completed
-                    && event->session_close_acknowledged,
-                event->pending,
-                &decision
-            );
-            if (applied == ESP_OK) {
-                ESP_LOGW(
-                    TAG,
-                    "staged map write started after attach-time sync"
-                );
-            }
-        }
+        atomic_store(&auto_apply_after_sync, true);
     }
 #endif
 
@@ -1151,6 +1139,42 @@ static void log_device_state(
 )
 {
     (void)context;
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    /*
+     * The transport only accepts a write while it holds an eligible device
+     * handle. After a sync that means waiting out the polite session close
+     * and the software re-enumeration it triggers, which is why this runs
+     * here on the return to AVAILABLE rather than on the sync event itself.
+     */
+    if (snapshot != NULL
+        && snapshot->state == REVLINK_DEVICE_AVAILABLE
+        && atomic_exchange(&auto_apply_after_sync, false)
+        && !atomic_load(&shutdown_requested)) {
+        bool identified = false;
+        revlink_ap_device_info_t attached = {0};
+        if (revlink_runtime_connected_accessport_snapshot(
+                &identified,
+                &attached
+            ) == ESP_OK
+            && identified) {
+            revlink_staged_map_apply_decision_t decision =
+                REVLINK_STAGED_MAP_APPLY_NOTHING_STAGED;
+            const esp_err_t applied = revlink_map_upload_auto_apply(
+                &attached,
+                true,
+                0U,
+                &decision
+            );
+            ESP_LOGW(
+                TAG,
+                "staged map after sync: %s",
+                applied == ESP_OK
+                    ? "write started"
+                    : revlink_staged_map_apply_decision_name(decision)
+            );
+        }
+    }
+#endif
 #if CONFIG_REVLINK_STATUS_OLED
     revlink_status_oled_update_device(snapshot);
 #endif
