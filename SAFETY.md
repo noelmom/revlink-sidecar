@@ -17,6 +17,7 @@ proceed the moment anything is ambiguous.
 | List directories | Enabled | Read-only |
 | Download files | Enabled | Verified by size and SHA-256, published atomically |
 | Upload a map | **Gated** | Compile flag + persistent owner consent |
+| Auto-apply a staged map | **Gated** | The above, plus a separate preference and a matching pinned device — see [STAGED_MAPS.md](docs/STAGED_MAPS.md) |
 | Replace the startup screen | **Gated** | Fixed destination only |
 | Delete | **Not implemented as a product feature** | Destructive; not part of the tuner workflow |
 | ECU flashing / live tuning | **Out of scope permanently** | Not a goal of this project |
@@ -83,6 +84,7 @@ Claims here are limited to what has been verified on a real device.
 **Not yet accepted on hardware:**
 
 - Live map upload round-trip against a device
+- Automatic application of a staged map on attach
 - Startup-screen replacement against a device
 - Powered-hub behavior with two AccessPorts attached
 - Cooperative cancellation and shutdown *during* an active sync

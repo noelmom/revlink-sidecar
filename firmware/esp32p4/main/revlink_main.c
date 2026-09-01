@@ -71,6 +71,7 @@ static void schedule_auto_sync_retry(revlink_application_t *target);
 #define REVLINK_SETTINGS_NAMESPACE "revlink"
 #define REVLINK_AUTO_SYNC_KEY "auto_sync"
 #define REVLINK_WRITE_CONSENT_KEY "write_ok"
+#define REVLINK_MAP_AUTO_APPLY_KEY "map_auto"
 
 static uint64_t monotonic_ms(void *context)
 {
@@ -488,6 +489,44 @@ static void handle_sync_event(
         }
     }
 
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    /*
+     * A staged map is written only once the read-only inventory is fully
+     * synchronized: after a clean acknowledged close, with nothing pending,
+     * and with no continuation batch queued. Every remaining gate — owner
+     * consent, the auto-apply preference, and the pinned AccessPort identity
+     * — is evaluated inside the write service.
+     */
+    if (status == REVLINK_SYNC_OK
+        && event->kind == REVLINK_SYNC_EVENT_COMPLETED
+        && !continuation_needed
+        && !atomic_load(&shutdown_requested)) {
+        bool identified = false;
+        revlink_ap_device_info_t attached = {0};
+        if (revlink_runtime_connected_accessport_snapshot(
+                &identified,
+                &attached
+            ) == ESP_OK
+            && identified) {
+            revlink_staged_map_apply_decision_t decision =
+                REVLINK_STAGED_MAP_APPLY_NOTHING_STAGED;
+            const esp_err_t applied = revlink_map_upload_auto_apply(
+                &attached,
+                event->data_phase_completed
+                    && event->session_close_acknowledged,
+                event->pending,
+                &decision
+            );
+            if (applied == ESP_OK) {
+                ESP_LOGW(
+                    TAG,
+                    "staged map write started after attach-time sync"
+                );
+            }
+        }
+    }
+#endif
+
     const bool unclean_terminal_close =
         status == REVLINK_SYNC_OK
         && event->kind == REVLINK_SYNC_EVENT_FAILED
@@ -802,6 +841,37 @@ static revlink_sync_policy_t load_sync_policy(void)
     return policy;
 }
 
+static bool load_map_auto_apply(void)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (!settings_ready) return false;
+
+    uint8_t stored = 0U;
+    const esp_err_t read_status = nvs_get_u8(
+        settings_handle,
+        REVLINK_MAP_AUTO_APPLY_KEY,
+        &stored
+    );
+    if (read_status == ESP_OK) return stored != 0U;
+    if (read_status != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(
+            TAG,
+            "auto-apply setting unreadable; staged maps stay manual: %s",
+            esp_err_to_name(read_status)
+        );
+        return false;
+    }
+    /* Never set: fall back to the build default. */
+#ifdef CONFIG_REVLINK_MAP_AUTO_APPLY_DEFAULT
+    return true;
+#else
+    return false;
+#endif
+#else
+    return false;
+#endif
+}
+
 static bool load_write_consent(void)
 {
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
@@ -876,6 +946,38 @@ esp_err_t revlink_runtime_set_write_consent(bool enabled)
         previous.consent_enabled ? 1U : 0U
     );
     (void)nvs_commit(settings_handle);
+    return set_status != ESP_OK ? set_status : commit_status;
+#else
+    (void)enabled;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t revlink_runtime_set_map_auto_apply(bool enabled)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (!settings_ready || atomic_load(&shutdown_requested)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    revlink_map_upload_snapshot_t previous = {0};
+    const esp_err_t snapshot_status =
+        revlink_map_upload_snapshot(&previous);
+    if (snapshot_status != ESP_OK) return snapshot_status;
+    const esp_err_t apply_status =
+        revlink_map_upload_set_auto_apply(enabled);
+    if (apply_status != ESP_OK) return apply_status;
+
+    const esp_err_t set_status = nvs_set_u8(
+        settings_handle,
+        REVLINK_MAP_AUTO_APPLY_KEY,
+        enabled ? 1U : 0U
+    );
+    const esp_err_t commit_status =
+        set_status == ESP_OK ? nvs_commit(settings_handle) : set_status;
+    if (set_status == ESP_OK && commit_status == ESP_OK) return ESP_OK;
+
+    (void)revlink_map_upload_set_auto_apply(previous.auto_apply_enabled);
     return set_status != ESP_OK ? set_status : commit_status;
 #else
     (void)enabled;
@@ -1104,6 +1206,15 @@ static void handle_usb_event(
         && !event->software_reenumeration
     ) {
         set_connected_accessport_identity(NULL, NULL);
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+        /*
+         * A genuine attach/detach boundary starts a new automatic-write
+         * opportunity. The software re-enumeration that follows a polite
+         * session close deliberately does not, so a single physical attach
+         * gets exactly one automatic attempt.
+         */
+        revlink_map_upload_notify_attach();
+#endif
     }
 #if CONFIG_REVLINK_USB_SESSION_CYCLE_ACCEPTANCE
     if (event->kind == REVLINK_DEVICE_EVENT_ATTACHED
@@ -1417,6 +1528,16 @@ void app_main(void)
                 TAG,
                 "Unable to restore write-consent setting: %s",
                 esp_err_to_name(consent_status)
+            );
+            return;
+        }
+        const esp_err_t auto_apply_status =
+            revlink_map_upload_set_auto_apply(load_map_auto_apply());
+        if (auto_apply_status != ESP_OK) {
+            ESP_LOGE(
+                TAG,
+                "Unable to restore staged-map auto-apply setting: %s",
+                esp_err_to_name(auto_apply_status)
             );
             return;
         }

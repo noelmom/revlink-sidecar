@@ -400,6 +400,9 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
     char escaped_upload_destination[
         REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY * 2U + 3U
     ];
+    char escaped_upload_target[
+        REVLINK_AP_PART_NUMBER_CAPACITY * 2U + 3U
+    ];
     const esp_app_desc_t *app_description = esp_app_get_description();
     char escaped_build_version[
         sizeof(app_description->version) * 2U + 3U
@@ -509,6 +512,11 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
             sizeof(escaped_upload_destination)
         )
         || !json_escape(
+            upload.target_part_number,
+            escaped_upload_target,
+            sizeof(escaped_upload_target)
+        )
+        || !json_escape(
             app_description->version,
             escaped_build_version,
             sizeof(escaped_build_version)
@@ -532,7 +540,7 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         );
     }
 
-    char *response = malloc(5800U);
+    char *response = malloc(6100U);
     if (response == NULL) {
         free(storage);
         return send_json(
@@ -549,7 +557,7 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         || sync->state == REVLINK_SYNC_CANCELLING;
     const int length = snprintf(
         response,
-        5800U,
+        6100U,
         "{"
         "\"build\":{\"version\":%s,\"date\":%s,\"time\":%s},"
         "\"accessPortCatalog\":{\"revision\":\"%s\",\"partCount\":%u},"
@@ -584,7 +592,8 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         "\"writeRecoveryRequired\":%s},"
         "\"mapUpload\":{\"state\":\"%s\",\"kind\":\"%s\","
         "\"staged\":%s,\"name\":%s,"
-        "\"destination\":%s,\"size\":%" PRIu32 ",\"platformError\":%d}"
+        "\"destination\":%s,\"size\":%" PRIu32 ",\"platformError\":%d,"
+        "\"autoApply\":%s,\"pinned\":%s,\"targetPartNumber\":%s}"
         "}",
         escaped_build_version,
         escaped_build_date,
@@ -668,10 +677,13 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         escaped_upload_name,
         escaped_upload_destination,
         upload.size,
-        upload.platform_error
+        upload.platform_error,
+        upload.auto_apply_enabled ? "true" : "false",
+        upload.target_serial[0] != '\0' ? "true" : "false",
+        escaped_upload_target
     );
     free(storage);
-    if (length <= 0 || length >= 5800) {
+    if (length <= 0 || length >= 6100) {
         free(response);
         return send_json(
             request,
@@ -1831,6 +1843,13 @@ static esp_err_t portal_startup_apply_handler(httpd_req_t *request)
         "images/startup_screen.fb",
         REVLINK_AP_STARTUP_SCREEN_BYTES
     );
+    /* This flow requires the device already attached, so pin to it. */
+    if (status == ESP_OK) {
+        status = revlink_map_upload_stage_set_target(
+            identity.part_number,
+            identity.serial
+        );
+    }
     uint8_t *buffer =
         status == ESP_OK ? malloc(PORTAL_FILE_STREAM_BYTES) : NULL;
     if (status == ESP_OK && buffer == NULL) status = ESP_ERR_NO_MEM;
@@ -1928,6 +1947,33 @@ static esp_err_t portal_write_consent_handler(httpd_req_t *request)
           );
 }
 
+/*
+ * The AccessPort a staged map belongs to is the one whose dataset is
+ * currently selected in the portal. Staging happens with no device attached,
+ * so the selected cached dataset is the only expression of intent available.
+ */
+static bool portal_selected_device_identity(
+    revlink_ap_device_info_t *identity
+)
+{
+    revlink_sd_cached_devices_snapshot_t *snapshot =
+        calloc(1U, sizeof(*snapshot));
+    if (snapshot == NULL) return false;
+
+    bool found = false;
+    if (revlink_sd_cached_devices_snapshot(snapshot) == ESP_OK) {
+        for (size_t index = 0U; index < snapshot->count; ++index) {
+            if (!snapshot->devices[index].selected) continue;
+            *identity = snapshot->devices[index].identity;
+            found = identity->serial[0] != '\0'
+                && identity->part_number[0] != '\0';
+            break;
+        }
+    }
+    free(snapshot);
+    return found;
+}
+
 static esp_err_t portal_map_stage_handler(httpd_req_t *request)
 {
     if (!portal_header_is_valid(request)) {
@@ -1988,6 +2034,18 @@ static esp_err_t portal_map_stage_handler(httpd_req_t *request)
                 : "{\"error\":\"Another map operation is already in progress\"}"
         );
     }
+    /*
+     * Pin the payload to the selected dataset's AccessPort before any bytes
+     * are accepted. An unpinned staged map can still be applied by hand with
+     * the device in front of you, but it will never be written automatically.
+     */
+    revlink_ap_device_info_t target = {0};
+    const bool pinned = portal_selected_device_identity(&target)
+        && revlink_map_upload_stage_set_target(
+               target.part_number,
+               target.serial
+           ) == ESP_OK;
+
     uint8_t *buffer = malloc(PORTAL_MAP_STREAM_BYTES);
     if (buffer == NULL) {
         revlink_map_upload_stage_abort();
@@ -2025,12 +2083,79 @@ static esp_err_t portal_map_stage_handler(httpd_req_t *request)
     }
     free(buffer);
     status = revlink_map_upload_stage_commit();
+    if (status != ESP_OK) {
+        return send_json(
+            request,
+            HTTPD_500,
+            "{\"error\":\"Unable to commit staged map\"}"
+        );
+    }
+    char body[192];
+    (void)snprintf(
+        body,
+        sizeof(body),
+        "{\"ok\":true,\"staged\":true,\"pinned\":%s,\"target\":\"%s\"}",
+        pinned ? "true" : "false",
+        pinned ? target.part_number : ""
+    );
+    return send_json(request, HTTPD_200, body);
+}
+
+static esp_err_t portal_map_auto_apply_handler(httpd_req_t *request)
+{
+    if (!portal_header_is_valid(request)) {
+        return send_json(
+            request,
+            "403 Forbidden",
+            "{\"error\":\"Portal request header is missing\"}"
+        );
+    }
+    char body[32] = {0};
+    if (request->content_len <= 0
+        || (size_t)request->content_len >= sizeof(body)) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"Auto-apply request is invalid\"}"
+        );
+    }
+    size_t received = 0U;
+    while (received < (size_t)request->content_len) {
+        const int count = httpd_req_recv(
+            request,
+            body + received,
+            (size_t)request->content_len - received
+        );
+        if (count <= 0) {
+            return send_json(
+                request,
+                HTTPD_400,
+                "{\"error\":\"Incomplete auto-apply request\"}"
+            );
+        }
+        received += (size_t)count;
+    }
+    const bool enabled =
+        received == sizeof("enabled=true") - 1U
+        && memcmp(body, "enabled=true", received) == 0;
+    const bool disabled =
+        received == sizeof("enabled=false") - 1U
+        && memcmp(body, "enabled=false", received) == 0;
+    if (!enabled && !disabled) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"Auto-apply must be true or false\"}"
+        );
+    }
+    const esp_err_t status = revlink_runtime_set_map_auto_apply(enabled);
     return status == ESP_OK
-        ? send_json(request, HTTPD_200, "{\"ok\":true,\"staged\":true}")
+        ? send_json(request, HTTPD_200, "{\"ok\":true}")
         : send_json(
               request,
-              HTTPD_500,
-              "{\"error\":\"Unable to commit staged map\"}"
+              status == ESP_ERR_NOT_SUPPORTED
+                  ? "501 Not Implemented" : "409 Conflict",
+              "{\"error\":\"Unable to change staged-map auto-apply\"}"
           );
 }
 
@@ -2601,6 +2726,11 @@ esp_err_t revlink_portal_register(httpd_handle_t server)
             "/api/portal/maps/apply",
             HTTP_POST,
             portal_map_apply_handler
+        },
+        {
+            "/api/portal/maps/auto-apply",
+            HTTP_POST,
+            portal_map_auto_apply_handler
         },
         {
             "/api/portal/startup/profiles",

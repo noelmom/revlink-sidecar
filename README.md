@@ -36,6 +36,10 @@ Everything runs on the device. Your files land on a microSD card you own.
   evidence it used.
 - **Multi-device.** Keeps separate datasets per AccessPort, so a shop can
   service several cars without mixing files.
+- **Stage a map without the device.** Upload a `.ptm` while the AccessPort is
+  unplugged; it is pinned to that car, survives a power cycle, and can be
+  written on the next attach. Off by default — see
+  [SAFETY.md](SAFETY.md).
 - **Direct download and share.** Pull individual CSVs, or hand them to your
   phone's native share sheet.
 - **OLED status.** Optional 1.3" SH1106 shows attach, sync, and network state
@@ -61,6 +65,7 @@ This project reads and writes *files*. It is not a tuning tool.
 | Waveshare **ESP32-P4-WIFI6-DEV-KIT** (SKU 32054) | Also supported. Needs a *separate* binary — P4 revision 3.x silicon vs the Nano's 1.x. |
 | microSD card | Stores all synced files. |
 | 1.3" SH1106 OLED (optional) | SPI. Status display. |
+| USB-C power bank | The reference build runs off an Anker Nano. The Sidecar powers the AccessPort as a USB host, so give it a real 5 V supply — never source VBUS from a GPIO. |
 | 3D-printed enclosure | [`hardware/nano-enclosure/`](hardware/nano-enclosure/) |
 
 **Why ESP32-P4 and not an S3?** The S3's native USB host is full-speed only,
@@ -134,6 +139,7 @@ docs/               Architecture, safety model, networking, storage, bring-up
 | [FIRMWARE_ARCHITECTURE.md](docs/FIRMWARE_ARCHITECTURE.md) | Component boundaries, device lifecycle, stable contracts |
 | [SINGLE_ACCESSPORT_SAFETY.md](docs/SINGLE_ACCESSPORT_SAFETY.md) | Why two attached AccessPorts fail closed instead of guessing |
 | [MAP_WRITE_ACCEPTANCE.md](docs/MAP_WRITE_ACCEPTANCE.md) | The gated round-trip procedure for map writes |
+| [STAGED_MAPS.md](docs/STAGED_MAPS.md) | Uploading a map with no AccessPort attached, and applying it on the next sync |
 | [PRODUCT_NETWORKING.md](docs/PRODUCT_NETWORKING.md) | Client-first Wi-Fi with fallback hotspot and captive portal |
 | [ACCESSPORT_STORAGE_BEHAVIOR.md](docs/ACCESSPORT_STORAGE_BEHAVIOR.md) | How the device's filesystem actually behaves |
 | [SUPPORTED_ACCESSPORTS.md](docs/SUPPORTED_ACCESSPORTS.md) | Which hardware is verified, and how families are identified |

@@ -14,6 +14,7 @@ revlink_control_status_t revlink_runtime_control_execute(
 
 revlink_sync_status_t revlink_runtime_set_auto_sync(bool enabled);
 esp_err_t revlink_runtime_set_write_consent(bool enabled);
+esp_err_t revlink_runtime_set_map_auto_apply(bool enabled);
 revlink_sync_status_t revlink_runtime_request_sync(void);
 revlink_sync_status_t revlink_runtime_cancel_sync(void);
 revlink_sync_status_t revlink_runtime_prepare_shutdown(void);

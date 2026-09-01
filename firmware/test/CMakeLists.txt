@@ -195,6 +195,19 @@ target_compile_options(
     PRIVATE -Wall -Wextra -Werror -Wpedantic
 )
 
+add_library(
+    revlink_staged_map
+    ../components/revlink_staged_map/revlink_staged_map.c
+)
+target_include_directories(
+    revlink_staged_map
+    PUBLIC ../components/revlink_staged_map/include
+)
+target_compile_options(
+    revlink_staged_map
+    PRIVATE -Wall -Wextra -Werror -Wpedantic
+)
+
 add_executable(protocol_host_cli protocol_host_cli.c)
 target_link_libraries(protocol_host_cli PRIVATE revlink_accessport_protocol)
 target_compile_options(protocol_host_cli PRIVATE -Wall -Wextra -Werror -Wpedantic)
@@ -336,6 +349,13 @@ target_compile_options(
     PRIVATE -Wall -Wextra -Werror -Wpedantic
 )
 
+add_executable(staged_map_host_test staged_map_host_test.c)
+target_link_libraries(staged_map_host_test PRIVATE revlink_staged_map)
+target_compile_options(
+    staged_map_host_test
+    PRIVATE -Wall -Wextra -Werror -Wpedantic
+)
+
 enable_testing()
 add_test(NAME protocol_unit COMMAND protocol_host_cli self-test)
 add_test(NAME accessport_catalog COMMAND catalog_host_test)
@@ -352,6 +372,7 @@ add_test(NAME update_health_gate COMMAND update_health_host_test)
 add_test(NAME control_service COMMAND control_host_test)
 add_test(NAME status_model COMMAND status_host_test)
 add_test(NAME cli_contract COMMAND cli_host_test)
+add_test(NAME staged_map COMMAND staged_map_host_test)
 # The captured-request parity test is intentionally absent from this
 # repository. It replays a corpus of USB captures that is not published here.
 # `protocol_unit` above still exercises the protocol builders and parsers

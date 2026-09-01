@@ -17,17 +17,28 @@
 #define REVLINK_UPLOAD_DIRECTORY "/sdcard/revlink/system/uploads"
 #define REVLINK_UPLOAD_TEMP_PATH REVLINK_UPLOAD_DIRECTORY "/map.tmp"
 #define REVLINK_UPLOAD_STAGE_PATH REVLINK_UPLOAD_DIRECTORY "/map.stage"
+#define REVLINK_UPLOAD_META_PATH REVLINK_UPLOAD_DIRECTORY "/map.meta"
+#define REVLINK_UPLOAD_META_TEMP_PATH REVLINK_UPLOAD_DIRECTORY "/map.meta.tmp"
 #define REVLINK_UPLOAD_AUDIT_PATH \
     "/sdcard/revlink/system/acceptance/map-write-audit.log"
+
+#define REVLINK_UPLOAD_VERIFY_CHUNK_BYTES 4096U
 
 typedef struct {
     SemaphoreHandle_t mutex;
     bool started;
     bool consent_enabled;
+    bool auto_apply_enabled;
     bool staged;
     bool staging;
     bool source_open;
     bool recovery_required;
+    /*
+     * One automatic attempt per attach. Cleared by
+     * revlink_map_upload_notify_attach(), never by a sync completing, so a
+     * failed automatic write is not retried by a second sync batch.
+     */
+    bool auto_apply_attempted;
     revlink_ap_upload_kind_t kind;
     FILE *stage_stream;
     FILE *source_stream;
@@ -39,6 +50,8 @@ typedef struct {
     esp_err_t platform_error;
     char name[REVLINK_ACCESSPORT_UPLOAD_NAME_CAPACITY];
     char destination[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY];
+    char target_part_number[REVLINK_AP_PART_NUMBER_CAPACITY];
+    char target_serial[REVLINK_AP_SERIAL_CAPACITY];
     uint8_t sha256[REVLINK_ACCESSPORT_UPLOAD_SHA256_BYTES];
 } map_upload_service_t;
 
@@ -64,6 +77,233 @@ static bool take_lock(void)
 static void give_lock(void)
 {
     xSemaphoreGive(service.mutex);
+}
+
+/*
+ * Remove both halves of a staged payload from the card. Metadata first: a
+ * payload without metadata is inert, but metadata without a payload could be
+ * misread. This does not touch in-memory staging state, so it is safe to call
+ * while a replacement payload is mid-commit.
+ */
+static void remove_staged_files_locked(void)
+{
+    unlink(REVLINK_UPLOAD_META_PATH);
+    unlink(REVLINK_UPLOAD_META_TEMP_PATH);
+    unlink(REVLINK_UPLOAD_STAGE_PATH);
+}
+
+/* Remove the files and forget the payload entirely. */
+static void discard_staged_locked(void)
+{
+    remove_staged_files_locked();
+    service.staged = false;
+    service.target_part_number[0] = '\0';
+    service.target_serial[0] = '\0';
+}
+
+/* Write the metadata sidecar atomically: temp file, flush, fsync, rename. */
+static bool write_metadata_locked(void)
+{
+    revlink_staged_map_record_t record;
+    memset(&record, 0, sizeof(record));
+    record.kind = service.kind == REVLINK_AP_UPLOAD_STARTUP_SCREEN
+        ? REVLINK_STAGED_MAP_KIND_STARTUP_IMAGE
+        : REVLINK_STAGED_MAP_KIND_MAP;
+    record.size = service.expected_size;
+    memcpy(record.sha256, service.sha256, sizeof(record.sha256));
+    if (!copy_bounded(record.name, sizeof(record.name), service.name)
+        || !copy_bounded(
+               record.destination,
+               sizeof(record.destination),
+               service.destination
+           )
+        || !copy_bounded(
+               record.target_part_number,
+               sizeof(record.target_part_number),
+               service.target_part_number
+           )
+        || !copy_bounded(
+               record.target_serial,
+               sizeof(record.target_serial),
+               service.target_serial
+           )) {
+        return false;
+    }
+
+    uint8_t encoded[REVLINK_STAGED_MAP_RECORD_BYTES];
+    if (revlink_staged_map_encode(
+            &record,
+            encoded,
+            sizeof(encoded),
+            NULL
+        ) != REVLINK_STAGED_MAP_OK) {
+        return false;
+    }
+
+    FILE *stream = fopen(REVLINK_UPLOAD_META_TEMP_PATH, "wb");
+    if (stream == NULL) return false;
+    const bool written =
+        fwrite(encoded, 1U, sizeof(encoded), stream) == sizeof(encoded)
+        && fflush(stream) == 0 && fsync(fileno(stream)) == 0;
+    fclose(stream);
+    if (!written) {
+        unlink(REVLINK_UPLOAD_META_TEMP_PATH);
+        return false;
+    }
+    /* FatFS rename() does not replace an existing destination. */
+    unlink(REVLINK_UPLOAD_META_PATH);
+    if (rename(
+            REVLINK_UPLOAD_META_TEMP_PATH,
+            REVLINK_UPLOAD_META_PATH
+        ) != 0) {
+        unlink(REVLINK_UPLOAD_META_TEMP_PATH);
+        return false;
+    }
+    return true;
+}
+
+/* Recompute SHA-256 over the staged payload and compare with the record. */
+static bool staged_payload_digest_matches(
+    const revlink_staged_map_record_t *record
+)
+{
+    FILE *stream = fopen(REVLINK_UPLOAD_STAGE_PATH, "rb");
+    if (stream == NULL) return false;
+
+    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
+    if (psa_hash_setup(&operation, PSA_ALG_SHA_256) != PSA_SUCCESS) {
+        fclose(stream);
+        return false;
+    }
+
+    uint8_t buffer[REVLINK_UPLOAD_VERIFY_CHUNK_BYTES];
+    uint32_t total = 0U;
+    bool ok = true;
+    for (;;) {
+        const size_t count = fread(buffer, 1U, sizeof(buffer), stream);
+        if (count == 0U) {
+            ok = ferror(stream) == 0;
+            break;
+        }
+        /*
+         * total <= record->size is an invariant, so this subtraction cannot
+         * underflow. Stop at the first byte past the recorded length instead
+         * of hashing an arbitrarily long file before rejecting it.
+         */
+        if ((uint32_t)count > record->size - total
+            || psa_hash_update(&operation, buffer, count) != PSA_SUCCESS) {
+            ok = false;
+            break;
+        }
+        total += (uint32_t)count;
+    }
+    fclose(stream);
+
+    uint8_t digest[REVLINK_ACCESSPORT_UPLOAD_SHA256_BYTES];
+    size_t digest_length = 0U;
+    if (!ok || total != record->size
+        || psa_hash_finish(
+               &operation,
+               digest,
+               sizeof(digest),
+               &digest_length
+           ) != PSA_SUCCESS
+        || digest_length != sizeof(digest)) {
+        psa_hash_abort(&operation);
+        return false;
+    }
+    return memcmp(digest, record->sha256, sizeof(digest)) == 0;
+}
+
+/*
+ * Restore a payload staged before the last restart. Anything unverifiable is
+ * discarded rather than carried forward: a staged write must be exactly what
+ * the owner uploaded, or nothing at all.
+ */
+static void restore_staged_locked(void)
+{
+    FILE *stream = fopen(REVLINK_UPLOAD_META_PATH, "rb");
+    if (stream == NULL) {
+        /* No metadata: any payload left behind is inert. Clear it. */
+        unlink(REVLINK_UPLOAD_STAGE_PATH);
+        return;
+    }
+    uint8_t encoded[REVLINK_STAGED_MAP_RECORD_BYTES];
+    const size_t read = fread(encoded, 1U, sizeof(encoded), stream);
+    fclose(stream);
+
+    revlink_staged_map_record_t record;
+    const revlink_staged_map_status_t status =
+        revlink_staged_map_decode(encoded, read, &record);
+    if (status != REVLINK_STAGED_MAP_OK) {
+        ESP_LOGW(
+            TAG,
+            "Discarding staged map: metadata %s",
+            revlink_staged_map_status_name(status)
+        );
+        discard_staged_locked();
+        return;
+    }
+
+    /* Re-validate the destination against the current product policy, so a
+     * record written by a build with a wider policy cannot widen this one. */
+    revlink_ap_upload_kind_t kind = REVLINK_AP_UPLOAD_MAP;
+    if (revlink_ap_validate_upload_target(
+            (const uint8_t *)record.destination,
+            strlen(record.destination),
+            record.size,
+            &kind
+        ) != REVLINK_AP_OK) {
+        ESP_LOGW(
+            TAG,
+            "Discarding staged map: destination is not permitted by the "
+            "current write policy"
+        );
+        discard_staged_locked();
+        return;
+    }
+
+    if (!staged_payload_digest_matches(&record)) {
+        ESP_LOGW(
+            TAG,
+            "Discarding staged map: payload does not match its recorded "
+            "size and SHA-256"
+        );
+        discard_staged_locked();
+        return;
+    }
+
+    service.kind = kind;
+    service.expected_size = record.size;
+    memcpy(service.sha256, record.sha256, sizeof(service.sha256));
+    if (!copy_bounded(service.name, sizeof(service.name), record.name)
+        || !copy_bounded(
+               service.destination,
+               sizeof(service.destination),
+               record.destination
+           )
+        || !copy_bounded(
+               service.target_part_number,
+               sizeof(service.target_part_number),
+               record.target_part_number
+           )
+        || !copy_bounded(
+               service.target_serial,
+               sizeof(service.target_serial),
+               record.target_serial
+           )) {
+        discard_staged_locked();
+        return;
+    }
+    service.staged = true;
+    ESP_LOGW(
+        TAG,
+        "Restored staged %s '%s' (%" PRIu32 " bytes) pinned to part=%s",
+        kind == REVLINK_AP_UPLOAD_STARTUP_SCREEN ? "startup image" : "map",
+        service.destination,
+        service.expected_size,
+        service.target_part_number
+    );
 }
 
 static void reset_stage_writer_locked(void)
@@ -240,9 +480,14 @@ esp_err_t revlink_map_upload_start(void)
     if (service.mutex == NULL) return ESP_ERR_NO_MEM;
     service.started = true;
     service.consent_enabled = false;
+    service.auto_apply_enabled = false;
+    service.auto_apply_attempted = false;
     service.state = REVLINK_ACCESSPORT_UPLOAD_IDLE;
     service.platform_error = ESP_OK;
+    /* A partial payload from an interrupted upload is never resumable. */
     unlink(REVLINK_UPLOAD_TEMP_PATH);
+    unlink(REVLINK_UPLOAD_META_TEMP_PATH);
+    restore_staged_locked();
     ESP_LOGW(
         TAG,
         "Map-write capability compiled; runtime consent is OFF"
@@ -344,6 +589,9 @@ esp_err_t revlink_map_upload_stage_begin(
     service.stage_hash_active = true;
     service.staging = true;
     service.staged = false;
+    /* A new payload starts unpinned; the caller must pin it before commit. */
+    service.target_part_number[0] = '\0';
+    service.target_serial[0] = '\0';
     service.expected_size = size;
     service.kind = kind;
     service.written_size = 0U;
@@ -355,6 +603,43 @@ esp_err_t revlink_map_upload_stage_begin(
     (void)name;
     (void)destination;
     (void)size;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t revlink_map_upload_stage_set_target(
+    const char *part_number,
+    const char *serial
+)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (part_number == NULL || serial == NULL || !take_lock()) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!service.staging) {
+        give_lock();
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!copy_bounded(
+            service.target_part_number,
+            sizeof(service.target_part_number),
+            part_number
+        )
+        || !copy_bounded(
+               service.target_serial,
+               sizeof(service.target_serial),
+               serial
+           )) {
+        service.target_part_number[0] = '\0';
+        service.target_serial[0] = '\0';
+        give_lock();
+        return ESP_ERR_INVALID_ARG;
+    }
+    give_lock();
+    return ESP_OK;
+#else
+    (void)part_number;
+    (void)serial;
     return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
@@ -413,12 +698,12 @@ esp_err_t revlink_map_upload_stage_commit(void)
     if (valid) {
         /*
          * FatFS does not replace an existing destination during rename().
-         * Staging metadata is intentionally RAM-only, so a prior boot may
-         * leave an inert map.stage file behind. Remove that stale payload
-         * only after the replacement has been fully written, flushed,
-         * fsynced, and hashed.
+         * Drop the previous payload and its metadata together, only after
+         * the replacement has been fully written, flushed, fsynced, and
+         * hashed. The pin for the payload being committed lives in memory and
+         * is deliberately left intact here.
          */
-        unlink(REVLINK_UPLOAD_STAGE_PATH);
+        remove_staged_files_locked();
     }
     if (!valid
         || rename(
@@ -426,9 +711,36 @@ esp_err_t revlink_map_upload_stage_commit(void)
                REVLINK_UPLOAD_STAGE_PATH
            ) != 0) {
         unlink(REVLINK_UPLOAD_TEMP_PATH);
-        service.staged = false;
+        discard_staged_locked();
         give_lock();
         return ESP_FAIL;
+    }
+    /*
+     * Metadata carries the digest, the destination, and the AccessPort the
+     * payload is pinned to, and it is what lets a staged write survive a
+     * power cycle. It is only written for a pinned payload: a record with no
+     * target would have to be interpreted on the next boot as applying to
+     * whatever happens to be attached, which is exactly what must not happen.
+     *
+     * An unpinned payload still stages normally and can be applied by hand,
+     * it simply does not persist across a restart.
+     */
+    if (service.target_serial[0] != '\0') {
+        if (!write_metadata_locked()) {
+            ESP_LOGE(
+                TAG,
+                "Unable to persist staged-map metadata; discarding"
+            );
+            discard_staged_locked();
+            give_lock();
+            return ESP_FAIL;
+        }
+    } else {
+        ESP_LOGW(
+            TAG,
+            "Staged payload has no target AccessPort; it can be applied "
+            "manually but will not survive a restart or auto-apply"
+        );
     }
     service.staged = true;
     give_lock();
@@ -520,6 +832,141 @@ esp_err_t revlink_map_upload_request(
 #endif
 }
 
+esp_err_t revlink_map_upload_set_auto_apply(bool enabled)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (!service.started || !take_lock()) return ESP_ERR_INVALID_STATE;
+    service.auto_apply_enabled = enabled;
+    give_lock();
+    ESP_LOGW(
+        TAG,
+        "Staged-map auto-apply on next sync: %s",
+        enabled ? "ON" : "OFF"
+    );
+    return ESP_OK;
+#else
+    (void)enabled;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+void revlink_map_upload_notify_attach(void)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (!service.started || !take_lock()) return;
+    service.auto_apply_attempted = false;
+    give_lock();
+#endif
+}
+
+esp_err_t revlink_map_upload_auto_apply(
+    const revlink_ap_device_info_t *identity,
+    bool sync_completed_clean,
+    size_t sync_pending,
+    revlink_staged_map_apply_decision_t *decision
+)
+{
+    revlink_staged_map_apply_decision_t local =
+        REVLINK_STAGED_MAP_APPLY_WRITES_NOT_COMPILED;
+#if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
+    if (identity == NULL) {
+        local = REVLINK_STAGED_MAP_APPLY_NO_DEVICE;
+        if (decision != NULL) *decision = local;
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!service.started || !take_lock()) {
+        if (decision != NULL) *decision = local;
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    revlink_staged_map_apply_context_t context;
+    memset(&context, 0, sizeof(context));
+    context.writes_compiled = true;
+    context.consent_enabled = service.consent_enabled;
+    context.auto_apply_enabled = service.auto_apply_enabled;
+    context.staged = service.staged;
+    context.device_identified = identity->serial[0] != '\0';
+    context.sync_completed_clean = sync_completed_clean;
+    context.sync_pending = sync_pending;
+    context.transfer_running =
+        service.state == REVLINK_ACCESSPORT_UPLOAD_RUNNING;
+    context.recovery_required =
+        service.recovery_required
+        || revlink_accessport_usb_write_recovery_required();
+    context.already_attempted_this_attach = service.auto_apply_attempted;
+    (void)copy_bounded(
+        context.target_part_number,
+        sizeof(context.target_part_number),
+        service.target_part_number
+    );
+    (void)copy_bounded(
+        context.target_serial,
+        sizeof(context.target_serial),
+        service.target_serial
+    );
+    (void)copy_bounded(
+        context.attached_part_number,
+        sizeof(context.attached_part_number),
+        identity->part_number
+    );
+    (void)copy_bounded(
+        context.attached_serial,
+        sizeof(context.attached_serial),
+        identity->serial
+    );
+
+    local = revlink_staged_map_evaluate_apply(&context);
+    if (local != REVLINK_STAGED_MAP_APPLY_ALLOWED) {
+        give_lock();
+        if (decision != NULL) *decision = local;
+        /*
+         * Transient refusals are normal and quiet. A settled refusal with a
+         * staged payload present is worth surfacing, because the owner is
+         * waiting for a write that will not happen on its own.
+         */
+        if (context.staged
+            && !revlink_staged_map_apply_decision_is_transient(local)) {
+            ESP_LOGW(
+                TAG,
+                "Staged map not applied automatically: %s",
+                revlink_staged_map_apply_decision_name(local)
+            );
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /*
+     * Latch the attempt before releasing the lock. A write that fails is not
+     * retried by a later sync in the same attach; recovery is deliberate.
+     */
+    service.auto_apply_attempted = true;
+    char applied_destination[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY];
+    char applied_target[REVLINK_AP_PART_NUMBER_CAPACITY];
+    memcpy(
+        applied_destination,
+        service.destination,
+        sizeof(applied_destination)
+    );
+    memcpy(applied_target, service.target_part_number, sizeof(applied_target));
+    give_lock();
+
+    ESP_LOGW(
+        TAG,
+        "Applying staged map '%s' to pinned AccessPort part=%s",
+        applied_destination,
+        applied_target
+    );
+    if (decision != NULL) *decision = local;
+    return revlink_map_upload_request(identity);
+#else
+    (void)identity;
+    (void)sync_completed_clean;
+    (void)sync_pending;
+    if (decision != NULL) *decision = local;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
 esp_err_t revlink_map_upload_snapshot(
     revlink_map_upload_snapshot_t *snapshot
 )
@@ -535,6 +982,7 @@ esp_err_t revlink_map_upload_snapshot(
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
     if (!service.started || !take_lock()) return ESP_ERR_INVALID_STATE;
     snapshot->consent_enabled = service.consent_enabled;
+    snapshot->auto_apply_enabled = service.auto_apply_enabled;
     snapshot->staged = service.staged;
     snapshot->recovery_required =
         service.recovery_required
@@ -548,6 +996,16 @@ esp_err_t revlink_map_upload_snapshot(
         snapshot->destination,
         service.destination,
         sizeof(snapshot->destination)
+    );
+    memcpy(
+        snapshot->target_part_number,
+        service.target_part_number,
+        sizeof(snapshot->target_part_number)
+    );
+    memcpy(
+        snapshot->target_serial,
+        service.target_serial,
+        sizeof(snapshot->target_serial)
     );
     memcpy(snapshot->sha256, service.sha256, sizeof(snapshot->sha256));
     give_lock();

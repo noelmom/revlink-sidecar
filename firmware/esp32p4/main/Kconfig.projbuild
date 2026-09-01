@@ -378,6 +378,28 @@ config REVLINK_ALLOW_DEVICE_WRITES
         identity-pinned, and read-back-verified service also carries the exact
         images/startup_screen.fb workflow.
 
+config REVLINK_MAP_AUTO_APPLY_DEFAULT
+    bool "Default staged-map auto-apply preference to enabled"
+    default n
+    depends on REVLINK_ALLOW_DEVICE_WRITES
+    help
+        A map can be uploaded to the Sidecar while no AccessPort is attached.
+        It is stored on microSD together with its SHA-256 and the identity of
+        the AccessPort it was staged for, and it survives a power cycle.
+
+        When auto-apply is enabled, that staged map is written during the next
+        attach, but only after a clean and complete read-only sync, and only
+        if the attached AccessPort's part number and serial both match the
+        recorded target. A map staged for one car is never written to another.
+
+        This is only the factory default for the owner preference. It has no
+        effect unless write consent is also enabled in Settings, and one
+        automatic attempt is made per attach: a failed write is never retried
+        automatically.
+
+        Leave disabled unless the controlled round-trip in
+        docs/MAP_WRITE_ACCEPTANCE.md has been completed on real hardware.
+
 config REVLINK_WRITE_ACCEPTANCE_PART_NUMBER
     string "Write-acceptance AccessPort part-number pin"
     default ""

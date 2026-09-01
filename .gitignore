@@ -30,3 +30,7 @@ venv/
 !*.env.example
 secrets.*
 wifi-credentials.*
+
+# ESP-IDF managed component cache
+managed_components/
+dependencies.lock.bak

@@ -45,6 +45,7 @@ set(
     revlink_identity
     revlink_network
     revlink_power
+    revlink_staged_map
     revlink_status
     revlink_storage_recovery
     revlink_sync
