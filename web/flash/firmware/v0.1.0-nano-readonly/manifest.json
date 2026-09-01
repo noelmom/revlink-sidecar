@@ -1,0 +1,46 @@
+{
+  "name": "RevLink Sidecar",
+  "version": "0.1.0",
+  "profile": "nano-readonly",
+  "buildDate": "2026-09-01",
+  "idfVersion": "v6.0.2",
+  "chipFamily": "ESP32-P4",
+  "deviceWrites": false,
+  "notes": "Read-only release. AccessPort write transactions are compiled out.",
+  "silicon": {
+    "maxMajorRevisionExclusive": 3,
+    "targetBoard": "Waveshare ESP32-P4-NANO",
+    "rejectMessage": "This build targets the ESP32-P4-NANO, which uses pre-v3 P4 silicon. The board you connected reports revision v{rev}, which is the Dev Kit's v3.x silicon. ESP-IDF treats these as incompatible targets, so this image will not boot on it."
+  },
+  "flash": {
+    "mode": "dio",
+    "frequency": "80m",
+    "size": "16MB"
+  },
+  "parts": [
+    {
+      "path": "bootloader.bin",
+      "offset": 8192,
+      "size": 23280,
+      "sha256": "7bcc8650c9f523228f9ec64a526d7b2964f57aa5083df51564511ef7a7d990b7"
+    },
+    {
+      "path": "partition-table.bin",
+      "offset": 32768,
+      "size": 3072,
+      "sha256": "e0ab66bf6b4565319200f4f1d3939be7c39d35f4fa7fc0d2f7cbefcdbd3133c6"
+    },
+    {
+      "path": "ota-data-initial.bin",
+      "offset": 61440,
+      "size": 8192,
+      "sha256": "7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f"
+    },
+    {
+      "path": "revlink-sidecar.bin",
+      "offset": 131072,
+      "size": 1359088,
+      "sha256": "5dc2023ec17b83d7693f0a29f2001cf8db6768b3c8a2bde8ff8b7d0b06c81451"
+    }
+  ]
+}

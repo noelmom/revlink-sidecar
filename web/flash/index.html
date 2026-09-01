@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash RevLink Sidecar</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main>
+  <header>
+    <h1>Flash RevLink Sidecar</h1>
+    <p class="lede">
+      Put the firmware on your ESP32-P4 straight from this page. No toolchain,
+      no command line.
+    </p>
+    <p class="release" id="release">Loading release…</p>
+  </header>
+
+  <section id="support" hidden class="panel warn">
+    <h2>This browser can't flash</h2>
+    <p>
+      Flashing uses the Web Serial API, which today only Chromium-based
+      browsers implement — Chrome, Edge, Opera, Arc, Brave. Safari and Firefox
+      don't support it.
+    </p>
+    <p>
+      Open this page in one of those, or flash from a terminal instead — see
+      <a href="https://github.com/noelmom/revlink-sidecar#build">Build</a>.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Before you start</h2>
+    <ol>
+      <li>Connect the board to this computer with a <strong>data</strong> USB-C
+        cable. Charge-only cables are the most common reason a board never
+        appears.</li>
+      <li>Close anything else holding the serial port — a serial monitor,
+        <code>idf.py monitor</code>, the Arduino IDE.</li>
+      <li>If the board isn't offered in the port list, hold <strong>BOOT</strong>,
+        tap <strong>RST</strong>, then release <strong>BOOT</strong> to enter
+        download mode.</li>
+    </ol>
+  </section>
+
+  <section class="panel actions">
+    <div class="row">
+      <button id="connect" type="button" class="primary">Connect</button>
+      <button id="flash" type="button" disabled>Flash</button>
+      <button id="disconnect" type="button" disabled>Disconnect</button>
+    </div>
+    <p id="status" class="status">Loading…</p>
+    <div id="progress" class="progress" hidden><div id="bar" class="bar"></div></div>
+  </section>
+
+  <section id="device" class="panel" hidden>
+    <h2>Connected board</h2>
+    <dl id="device-body"></dl>
+  </section>
+
+  <section class="panel">
+    <h2>What this installs</h2>
+    <p>
+      A <strong>read-only</strong> build. It lists, downloads, verifies, and
+      displays what's on your AccessPort. It cannot write to it: map upload and
+      startup-image replacement are compiled out of this image entirely, not
+      merely switched off.
+    </p>
+    <p>
+      That's deliberate. Reading has been accepted on real hardware; the map
+      write round-trip has not. See
+      <a href="https://github.com/noelmom/revlink-sidecar/blob/main/SAFETY.md">SAFETY.md</a>
+      for exactly what is and isn't proven.
+    </p>
+    <p class="fine">
+      Every file is checked against a SHA-256 recorded in the release manifest
+      before anything is written to the board. The flashing code
+      (<a href="vendor/esptool-js-0.6.1.js">esptool-js 0.6.1</a>) is served from
+      this site rather than a CDN, so no third party can substitute it.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>After flashing</h2>
+    <p>
+      The Sidecar restarts and either rejoins a Wi-Fi network it already knows
+      or starts its own <code>RevLink-…</code> hotspot. Join it and open
+      <code>http://revlink-&lt;id&gt;.local</code>, or the address shown on the
+      OLED if you fitted one.
+    </p>
+    <p>
+      Something not right?
+      <a href="https://github.com/noelmom/revlink-sidecar/issues">Open an issue</a>
+      — include the log below.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Log</h2>
+    <pre id="log" class="log"></pre>
+  </section>
+
+  <footer>
+    <p>
+      <a href="https://github.com/noelmom/revlink-sidecar">Source</a> ·
+      Apache-2.0 · Independent project, not affiliated with COBB Tuning.
+    </p>
+  </footer>
+</main>
+
+<script type="module" src="flash.js"></script>
+</body>
+</html>

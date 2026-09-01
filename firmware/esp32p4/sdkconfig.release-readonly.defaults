@@ -1,0 +1,15 @@
+# Public read-only release profile.
+#
+# Applied last, on top of the Nano product profile, to produce the binary
+# published for browser flashing.
+#
+# Device writes are compiled OUT of published images. Runtime owner consent is
+# the second line of defence; the compile gate is the unconditional one, and
+# the map-write round-trip in docs/MAP_WRITE_ACCEPTANCE.md has not yet been
+# accepted on hardware. Everything this image does — enumerate, list,
+# incrementally sync, verify by SHA-256, view, Vehicle Health — has been.
+#
+# Without this symbol the write service returns ESP_ERR_NOT_SUPPORTED and no
+# write code path exists at runtime. Restore writes only in a release that
+# follows a completed and documented hardware round-trip.
+CONFIG_REVLINK_ALLOW_DEVICE_WRITES=n

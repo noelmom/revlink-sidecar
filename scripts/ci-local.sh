@@ -171,6 +171,13 @@ else
   echo "  node not found; skipping portal tests." >&2
 fi
 
+phase "Web flasher tests"
+if have node; then
+  node --test web/flash/gate.test.mjs
+else
+  echo "  node not found; skipping flasher tests." >&2
+fi
+
 phase "Enclosure geometry baseline"
 if have python3; then
   python3 hardware/nano-enclosure/tools/stl_inspect.py \

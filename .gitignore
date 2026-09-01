@@ -8,6 +8,10 @@ managed_components/
 *.bin
 *.map
 
+# Published release artefacts are tracked on purpose: the web flasher
+# serves them same-origin and verifies them against manifest.json.
+!web/flash/firmware/**/*.bin
+
 # Host test builds
 cmake-build-*/
 

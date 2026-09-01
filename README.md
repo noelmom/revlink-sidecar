@@ -86,6 +86,20 @@ tried and retired — the full write-up is in
 > dependency-free way to verify a revision actually changed what you think it
 > changed.
 
+## Install
+
+**Easiest — flash from your browser.** Open the flasher page in Chrome or
+Edge, plug the board in over USB-C, and click Flash. No toolchain, no command
+line. It reads the board's silicon revision first and refuses to write an
+image built for the other P4 variant.
+
+The published image is **read-only**: it lists, downloads, verifies, and
+displays what's on your AccessPort, and cannot write to it. Map upload is
+compiled out of that build entirely, because reading has been accepted on
+hardware and writing has not.
+
+See [`web/flash/`](web/flash/) to host the page yourself.
+
 ## Build
 
 Requires **ESP-IDF v6.0.2**, pinned in
