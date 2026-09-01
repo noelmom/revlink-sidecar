@@ -1,12 +1,12 @@
 {
   "name": "RevLink Sidecar",
-  "version": "0.1.0",
-  "profile": "nano-readonly",
+  "version": "0.2.0",
+  "profile": "nano",
   "buildDate": "2026-09-01",
   "idfVersion": "v6.0.2",
   "chipFamily": "ESP32-P4",
-  "deviceWrites": false,
-  "notes": "Read-only release. AccessPort write transactions are compiled out.",
+  "deviceWrites": true,
+  "notes": "Nano product profile. Guarded AccessPort writes are compiled in; runtime owner consent defaults to locked.",
   "silicon": {
     "maxMajorRevisionExclusive": 3,
     "targetBoard": "Waveshare ESP32-P4-NANO",
@@ -22,7 +22,7 @@
       "path": "bootloader.bin",
       "offset": 8192,
       "size": 23280,
-      "sha256": "392cfdeab4e7f06071bcc43cf023aa76e116a23f6613f7021fa4d06767a3d628"
+      "sha256": "8316381c1c3f95e675305dae0a0c72a668e90058cc0032044b00939ffebb4a91"
     },
     {
       "path": "partition-table.bin",
@@ -39,8 +39,8 @@
     {
       "path": "revlink-sidecar.bin",
       "offset": 131072,
-      "size": 1359040,
-      "sha256": "744610c78d963eeb1c5b553c8265b05786778b9054d4b4eae1d8e8227b8c4ec7"
+      "size": 1375456,
+      "sha256": "997b473efb6e721a26f6a607639d8be87294ee60d05fa77f0dcaa06a720148ea"
     }
   ]
 }

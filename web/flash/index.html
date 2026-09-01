@@ -111,16 +111,22 @@
   <section class="panel">
     <h2>What this installs</h2>
     <p>
-      A <strong>read-only</strong> build. It lists, downloads, verifies, and
-      displays what's on your AccessPort. It cannot write to it: map upload and
-      startup-image replacement are compiled out of this image entirely, not
-      merely switched off.
+      The full build. It lists, downloads, verifies, and displays what's on
+      your AccessPort, and it can copy a <code>.ptm</code> map file back onto
+      the AccessPort's own storage.
     </p>
     <p>
-      That's deliberate. Reading has been accepted on real hardware; the map
-      write round-trip has not. See
+      Copying a map file is not the same as tuning a car. Installing a map
+      onto the ECU is a separate, deliberate action you take on the AccessPort
+      itself — nothing here can flash your ECU.
+    </p>
+    <p>
+      Even so, writes arrive <strong>locked</strong>. You have to turn them on
+      in Settings, only <code>maps/*.ptm</code> is accepted, and every write is
+      read back and checked against its SHA-256. The write path has not yet
+      completed its hardware round-trip, so treat it as new —
       <a href="https://github.com/noelmom/revlink-sidecar/blob/main/SAFETY.md">SAFETY.md</a>
-      for exactly what is and isn't proven.
+      says exactly what is and isn't proven.
     </p>
     <p class="fine">
       Every file is checked against a SHA-256 recorded in the release manifest

@@ -1,15 +1,16 @@
-# Public read-only release profile.
+# Optional read-only release profile.
 #
-# Applied last, on top of the Nano product profile, to produce the binary
-# published for browser flashing.
+# Applied last, on top of the Nano product profile, to build an image with the
+# AccessPort write service compiled out entirely. Without this symbol the
+# write service returns ESP_ERR_NOT_SUPPORTED and no write code path exists at
+# runtime.
 #
-# Device writes are compiled OUT of published images. Runtime owner consent is
-# the second line of defence; the compile gate is the unconditional one, and
-# the map-write round-trip in docs/MAP_WRITE_ACCEPTANCE.md has not yet been
-# accepted on hardware. Everything this image does — enumerate, list,
-# incrementally sync, verify by SHA-256, view, Vehicle Health — has been.
+# This is NOT what is published for browser flashing — the published image is
+# the Nano product profile, with guarded writes compiled in and runtime owner
+# consent defaulting to locked. Writing a .ptm file to the AccessPort's own
+# storage does not put a calibration into a vehicle: installing a map remains
+# a deliberate action taken on the AccessPort itself.
 #
-# Without this symbol the write service returns ESP_ERR_NOT_SUPPORTED and no
-# write code path exists at runtime. Restore writes only in a release that
-# follows a completed and documented hardware round-trip.
+# Keep this profile for anyone who wants the narrower image, and for testing
+# that the #else paths still compile.
 CONFIG_REVLINK_ALLOW_DEVICE_WRITES=n

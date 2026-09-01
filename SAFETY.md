@@ -16,11 +16,23 @@ proceed the moment anything is ambiguous.
 | --- | --- | --- |
 | List directories | Enabled | Read-only |
 | Download files | Enabled | Verified by size and SHA-256, published atomically |
-| Upload a map | **Gated** | Compile flag + persistent owner consent |
+| Upload a map file | **Gated** | Compile flag + persistent owner consent. Copies a `.ptm` onto the AccessPort's storage; it does not install anything onto an ECU |
 | Auto-apply a staged map | **Gated** | The above, plus a separate preference and a matching pinned device — see [STAGED_MAPS.md](docs/STAGED_MAPS.md) |
 | Replace the startup screen | **Gated** | Fixed destination only |
 | Delete | **Not implemented as a product feature** | Destructive; not part of the tuner workflow |
 | ECU flashing / live tuning | **Out of scope permanently** | Not a goal of this project |
+
+## What a "write" is here
+
+A write copies a file onto the AccessPort's own storage. It does not put a
+calibration into a vehicle. Installing a map onto the ECU is a separate,
+deliberate action the owner takes on the AccessPort itself, and nothing in
+this project can perform it or trigger it.
+
+That is why the published image ships with writes compiled in: the failure
+this project can plausibly cause is a damaged file or a confused `maps/`
+directory on the AccessPort, not a damaged engine. It is still gated, because
+the write path has not completed its hardware round-trip.
 
 ## The two write gates
 

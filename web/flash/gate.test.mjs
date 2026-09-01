@@ -8,7 +8,18 @@ import { dirname, join } from "node:path";
 import { evaluateGate, parseRevision } from "./gate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const RELEASE = join(here, "firmware", "v0.1.0-nano-readonly");
+
+/*
+ * Read the release directory out of flash.js rather than repeating it here.
+ * Hard-coding it once meant these tests kept checking a release the page no
+ * longer serves, which is the one failure mode a release test must not have.
+ */
+const flashSource = readFileSync(join(here, "flash.js"), "utf8");
+const releaseMatch = /const RELEASE = "([^"]+)"/.exec(flashSource);
+if (!releaseMatch) {
+  throw new Error("could not find the RELEASE constant in flash.js");
+}
+const RELEASE = join(here, releaseMatch[1]);
 const manifest = JSON.parse(
   readFileSync(join(RELEASE, "manifest.json"), "utf8")
 );
@@ -112,24 +123,38 @@ test("parts do not overlap in flash", () => {
   }
 });
 
-test("the published image really is the read-only build", () => {
-  assert.equal(
-    manifest.deviceWrites,
-    false,
-    "manifest claims device writes are compiled in"
-  );
-  // The write paths carry distinctive log strings. Their absence is the
-  // check that matters; the manifest flag alone is just an assertion.
+test("the published image matches what the manifest claims about writes", () => {
   const app = readFileSync(join(RELEASE, "revlink-sidecar.bin"));
-  for (const probe of [
+  const probes = [
     "Map-write capability compiled",
     "Runtime map-write consent",
-    "Applying staged map",
-  ]) {
-    assert.equal(
-      app.includes(Buffer.from(probe, "latin1")),
-      false,
-      `published image contains write-path string: ${probe}`
+  ];
+  const present = probes.filter((s) =>
+    app.includes(Buffer.from(s, "latin1"))
+  );
+
+  if (manifest.deviceWrites) {
+    assert.deepEqual(
+      present,
+      probes,
+      "manifest says writes are compiled in, but the write paths are absent"
+    );
+  } else {
+    assert.deepEqual(
+      present,
+      [],
+      "manifest says writes are compiled out, but the image contains them"
     );
   }
+});
+
+test("a write-capable image still ships with owner consent locked", () => {
+  if (!manifest.deviceWrites) return;
+  const app = readFileSync(join(RELEASE, "revlink-sidecar.bin"));
+  // The startup banner is emitted unconditionally when the capability is
+  // compiled in, and states the runtime default. Its wording is the contract.
+  assert.ok(
+    app.includes(Buffer.from("runtime consent is OFF", "latin1")),
+    "write-capable image does not declare consent locked at startup"
+  );
 });

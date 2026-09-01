@@ -23,7 +23,19 @@
 #include "revlink_identity.h"
 
 #define REVLINK_WIFI_SCAN_RECORD_LIMIT 24U
-#define REVLINK_WIFI_SCAN_TASK_STACK 4096U
+/*
+ * Raised from 4 KiB alongside the network runtime task while chasing a stack
+ * protection fault that rebooted the board every few tens of seconds, always
+ * around the scan-and-join phase.
+ *
+ * The network task was subsequently measured and cleared — its peak use is
+ * about 1.2 KiB — so if that fault was a stack overflow, this task is the
+ * better suspect: it drives the esp_hosted RPC scan, whose result set is
+ * assembled on this stack. The fault has not recurred since, but it has not
+ * been reproduced and attributed either, so this is a suspicion, not a
+ * diagnosis. The high-water logging below exists to settle it if it returns.
+ */
+#define REVLINK_WIFI_SCAN_TASK_STACK 6144U
 #define REVLINK_WIFI_HOTSPOT_STARTED_BIT BIT2
 #define REVLINK_WIFI_HOTSPOT_FAILED_BIT BIT3
 
@@ -411,6 +423,19 @@ static void scan_task(void *context)
 {
     (void)context;
     (void)perform_scan();
+    /*
+     * Report how close this task came to exhausting its stack, measured after
+     * the scan has done its deepest work. ESP-IDF's
+     * uxTaskGetStackHighWaterMark returns bytes, not words.
+     */
+    ESP_LOGI(
+        TAG,
+        "scan task stack: %u bytes free of %u (peak use %u)",
+        (unsigned int)uxTaskGetStackHighWaterMark(NULL),
+        (unsigned int)REVLINK_WIFI_SCAN_TASK_STACK,
+        (unsigned int)(REVLINK_WIFI_SCAN_TASK_STACK
+                       - uxTaskGetStackHighWaterMark(NULL))
+    );
     atomic_store(&scan_in_progress, false);
     vTaskDelete(NULL);
 }

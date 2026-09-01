@@ -12,7 +12,17 @@
 #include "revlink_credentials.h"
 #include "revlink_wifi_store.h"
 
-#define REVLINK_NETWORK_RUNTIME_TASK_STACK 4096U
+/*
+ * Raised from 4 KiB while investigating a stack protection fault that rebooted
+ * the board every few tens of seconds.
+ *
+ * Measurement since then says this task was NOT the one overflowing: its peak
+ * use is around 1.2 KiB, comfortably inside the old 4 KiB. The extra room is
+ * kept because it costs a few KiB of a 32 MiB budget and this task calls into
+ * the esp_hosted RPC stack, whose depth is not ours to control — but do not
+ * read this size as a diagnosis. See the note in revlink_wifi_radio.c.
+ */
+#define REVLINK_NETWORK_RUNTIME_TASK_STACK 8192U
 #define REVLINK_NETWORK_RUNTIME_TICK_MS 500U
 #define REVLINK_NETWORK_STARTUP_TIMEOUT_MS 20000U
 #define REVLINK_NETWORK_STARTUP_ATTEMPT_LIMIT 2U
@@ -273,8 +283,31 @@ static void runtime_task(void *context)
     (void)context;
     uint32_t fault_elapsed_ms = 0U;
     uint32_t stable_elapsed_ms = 0U;
+    /*
+     * Report the closest this task has come to exhausting its stack, so a
+     * future overflow arrives with evidence instead of requiring the panic to
+     * be caught live on a serial cable. Logged only when it drops to a new
+     * low, so a healthy device stays quiet.
+     */
+    UBaseType_t stack_low_water = UINT32_MAX;
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(REVLINK_NETWORK_RUNTIME_TICK_MS));
+
+        /*
+         * ESP-IDF's uxTaskGetStackHighWaterMark returns bytes, not words as
+         * vanilla FreeRTOS does. Do not scale it.
+         */
+        const UBaseType_t headroom = uxTaskGetStackHighWaterMark(NULL);
+        if (headroom < stack_low_water) {
+            stack_low_water = headroom;
+            ESP_LOGI(
+                TAG,
+                "network task stack: %u bytes free of %u (peak use %u)",
+                (unsigned int)headroom,
+                (unsigned int)REVLINK_NETWORK_RUNTIME_TASK_STACK,
+                (unsigned int)(REVLINK_NETWORK_RUNTIME_TASK_STACK - headroom)
+            );
+        }
         if (xSemaphoreTake(runtime_mutex, portMAX_DELAY) != pdTRUE) {
             continue;
         }

@@ -1,7 +1,7 @@
 import { ESPLoader, Transport } from "./vendor/esptool-js-0.6.1.js";
 import { evaluateGate, parseRevision } from "./gate.js";
 
-const RELEASE = "firmware/v0.1.0-nano-readonly";
+const RELEASE = "firmware/v0.2.0-nano";
 
 /*
  * Transfer speed. A USB-serial bridge that syncs happily at 460800 can
