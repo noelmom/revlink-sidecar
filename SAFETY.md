@@ -92,6 +92,8 @@ Claims here are limited to what has been verified on a real device.
 - Byte-exact protocol reconstruction of the full captured request corpus
 - Wi-Fi client rejoin, fallback hotspot, and captive portal across cold boots
 - Two-second BOOT-button safe shutdown with an idle attached AccessPort
+- A complete logical backup export downloaded end to end, 128 files, with the
+  device staying up throughout
 
 **Not yet accepted on hardware:**
 
@@ -119,12 +121,24 @@ them. On a card holding a few hundred megabytes of datalogs that is several
 minutes — 128 files took about two and a half on the reference Nano.
 
 The embedded HTTP server handles one request at a time, so nothing else is
-served while that runs. The portal used to poll `/api/portal/status` every
-2.5 seconds throughout and declare the Sidecar offline after three timeouts,
-about fifteen seconds in, while the backup was streaming perfectly well
-underneath. The portal now stops polling for the duration and does not treat
-a timeout during a known-busy period as a lost connection.
+served while that runs. Leave the tab open. The portal stops polling for the
+duration and does not treat a timeout during a known-busy period as a lost
+connection; before that it declared the Sidecar offline about fifteen seconds
+in, while the backup was streaming perfectly well underneath.
 
-Leave the tab open. The device stays healthy throughout: heap and stack are
-flat across the whole run, and the only thing that ends it early is the
-browser hanging up (`httpd_sock_err: error in recv : 104`).
+Verified on hardware: a complete export downloads successfully, and the
+device stays up through it. Heap holds flat at 33 MiB and the HTTP task keeps
+about 6 KiB of stack spare for the whole run.
+
+## Latent: restore path still keeps 4 KiB buffers on the stack
+
+`validate_pending()`, `skip_bytes()` and `revlink_backup_restore_merge()` each
+hold a `BACKUP_BUFFER_BYTES` array on the stack, on the same HTTP server task
+whose export equivalents had to be moved to the heap. Restore has not been
+exercised on hardware, so this has not been seen to fail — but the arithmetic
+is the same one that overflowed the export path.
+
+Fixing it is not a search-and-replace: those loops size their reads with
+`sizeof(buffer)`, which silently becomes the size of a pointer if the array
+is swapped for a `malloc`. Each function needs its read sizing and its free
+paths handled deliberately.
