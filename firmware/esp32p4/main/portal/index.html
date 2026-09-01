@@ -971,7 +971,7 @@
           return
         }
         const upload=state.status?.mapUpload||{};
-        toast(upload.pinned?`Saved for ${upload.target}`:'Saved, but not tied to a device');
+        toast(upload.pinned?`Saved for ${upload.targetPartNumber}`:'Saved, but not tied to a device');
       }catch(error){if(!connectionError(error))toast(error.message);await loadStatus()}
       finally{updateMapTransferButton()}
     }
