@@ -183,3 +183,99 @@ footer {
   dl { grid-template-columns: 1fr; gap: .1rem; }
   dt { margin-top: .5rem; }
 }
+
+/* Facsimile of the browser's serial-port chooser, so people know which entry
+   is theirs before the real dialog appears. Deliberately generic: the trailing
+   device digits differ on every machine. */
+.picker {
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--code);
+  padding: 1rem;
+  max-width: 30rem;
+}
+
+.picker-title {
+  font-weight: 650;
+  font-size: .92rem;
+  margin-bottom: .8rem;
+}
+
+.picker-list {
+  list-style: none;
+  margin: 0 0 .9rem;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.picker-list li {
+  margin: 0;
+  padding: .55rem .7rem;
+  font-size: .88rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.picker-list li:last-child { border-bottom: 0; }
+
+.picker-list .pick {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 650;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+}
+
+.pick-tag {
+  font-family: inherit;
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  opacity: .85;
+  white-space: nowrap;
+}
+
+.picker-buttons {
+  display: flex;
+  gap: .5rem;
+  justify-content: flex-end;
+}
+
+.picker-btn {
+  font-size: .82rem;
+  padding: .35rem .9rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.picker-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.speed {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: .9rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.speed select {
+  font: inherit;
+  padding: .35rem .5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}

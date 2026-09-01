@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RevLink Sidecar — use your AccessPort without a laptop</title>
+<meta name="description" content="An open-source ESP32-P4 that syncs your COBB AccessPort datalogs and maps to microSD and serves them to your phone. No PC, no cloud.">
+<meta property="og:title" content="RevLink Sidecar">
+<meta property="og:description" content="Use your AccessPort without a laptop. Open-source ESP32-P4 firmware, 3D-printable case, flash it from your browser.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/sidecar-hero.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main>
+
+  <header class="hero">
+    <h1>Use your AccessPort<br>without a laptop.</h1>
+    <p class="lede">
+      The COBB AccessPort holds your datalogs and maps over USB — but it only
+      talks to a Windows PC or a Mac. So the moment you want a log at the
+      track, at a meet, or in your own driveway, you go find a computer.
+    </p>
+    <p class="lede">
+      RevLink Sidecar is an ESP32-P4 that sits between the AccessPort and your
+      phone. Plug in, open a web page, and your files are there.
+    </p>
+
+    <div class="cta">
+      <a class="button primary" href="flash/">Flash it from your browser</a>
+      <a class="button" href="https://github.com/noelmom/revlink-sidecar">Source on GitHub</a>
+    </div>
+    <p class="fine">
+      Chromium browsers only for flashing — Chrome, Edge, Arc, Brave.
+      Apache-2.0. Free, and nothing to sign up for.
+    </p>
+  </header>
+
+  <figure class="shot">
+    <img src="assets/sidecar-hero.jpg" width="1600" height="900"
+         alt="A RevLink Sidecar in a printed white case sitting on a car's dashboard next to a pink COBB AccessPort, connected by a USB cable.">
+    <figcaption>A working prototype on the dash, syncing from the AccessPort beside it.</figcaption>
+  </figure>
+
+  <section>
+    <h2>What it does</h2>
+    <ul class="features">
+      <li>
+        <strong>Syncs on its own.</strong>
+        Plug in the AccessPort and new datalogs and maps copy to a microSD card
+        you own — incrementally, only what changed, checksum-verified.
+      </li>
+      <li>
+        <strong>Serves a web portal from the device.</strong>
+        It joins your home or shop Wi-Fi when it can, and starts its own
+        hotspot when it can't. No internet required, ever.
+      </li>
+      <li>
+        <strong>Graphs your logs on your phone.</strong>
+        Single and split views, searchable channels, presets for Air/Fuel,
+        Boost, Knock, Timing and Thermal, exact values under the pointer.
+      </li>
+      <li>
+        <strong>Vehicle Health.</strong>
+        A deterministic, local, rule-based pass over logs you've already
+        synced. No AI, no phone-home — it shows you the evidence it used.
+      </li>
+      <li>
+        <strong>Handles more than one car.</strong>
+        Separate datasets per AccessPort, so a shop doesn't mix files up.
+      </li>
+      <li>
+        <strong>Offline by design.</strong>
+        No account, no telemetry, no cloud dependency. Your data stays on your
+        card.
+      </li>
+    </ul>
+  </section>
+
+  <figure class="shot narrow">
+    <img src="assets/sidecar-oled.jpg" width="1200" height="900" loading="lazy"
+         alt="Close-up of the printed case showing a small OLED reading REVLINK, NO DEVICE, ACCESSPORT OFFLINE, CONNECT TO SYNC.">
+    <figcaption>An optional OLED shows attach, sync, and network state at a glance.</figcaption>
+  </figure>
+
+  <section>
+    <h2>What it deliberately doesn't do</h2>
+    <p>
+      This reads and writes <em>files</em>. It is not a tuning tool, and it is
+      a companion to your AccessPort rather than a replacement for it.
+    </p>
+    <ul class="plain">
+      <li>No ECU flashing. Not now, not planned.</li>
+      <li>No real-time tuning.</li>
+      <li>No decoding or unlocking of protected map content.</li>
+      <li>
+        The build you flash from this site is <strong>read-only</strong> —
+        writing to the AccessPort is compiled out of it entirely, not merely
+        switched off.
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What you need</h2>
+    <ul class="plain">
+      <li>A Waveshare <strong>ESP32-P4-NANO</strong> — around $30.</li>
+      <li>A microSD card.</li>
+      <li>A USB-C power bank. The reference build runs off an Anker Nano.</li>
+      <li>Optional: a 1.3&Prime; SH1106 OLED for status at a glance.</li>
+      <li>
+        Optional: the
+        <a href="https://github.com/noelmom/revlink-sidecar/tree/main/hardware/nano-enclosure">3D-printable case</a>
+        — STL and 3MF included.
+      </li>
+    </ul>
+    <p class="fine">
+      The ESP32-P4-WIFI6-DEV-KIT works too, but needs its own build: it uses
+      different silicon and the images are not interchangeable. The flasher
+      checks which board you have before writing anything.
+    </p>
+  </section>
+
+  <section>
+    <h2>Where it stands</h2>
+    <p>
+      A working prototype, developed in the open. Reading — enumerate, list,
+      incrementally sync, verify by SHA-256, view — has been accepted on real
+      hardware. Writing maps back to the device is implemented and tested off
+      the device, but has <em>not</em> been proven on hardware, which is
+      exactly why it isn't in the published build.
+    </p>
+    <p>
+      <a href="https://github.com/noelmom/revlink-sidecar/blob/main/SAFETY.md">SAFETY.md</a>
+      lists precisely what is and isn't proven. If something there is wrong,
+      that's a bug worth reporting.
+    </p>
+  </section>
+
+  <section class="help">
+    <h2>Contributions wanted</h2>
+    <p>
+      Especially: enclosure revisions (the lid still needs internal mounting
+      posts for the OLED), AccessPort part numbers this build doesn't know
+      yet, and portal UX. Everything runs on a laptop —
+      <code>./scripts/ci-local.sh</code>, no board required.
+    </p>
+    <p>
+      <a href="https://github.com/noelmom/revlink-sidecar/issues">Open an issue</a>
+      ·
+      <a href="https://github.com/noelmom/revlink-sidecar/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      <a href="flash/">Flash</a> ·
+      <a href="https://github.com/noelmom/revlink-sidecar">Source</a> ·
+      <a href="https://github.com/noelmom/revlink-sidecar/tree/main/docs">Docs</a> ·
+      <a href="https://github.com/noelmom/revlink-sidecar/blob/main/SAFETY.md">Safety</a>
+    </p>
+    <p class="fine">
+      Code Apache-2.0, hardware CC BY-SA 4.0. An independent, unofficial
+      project — not affiliated with, endorsed by, or sponsored by COBB Tuning.
+      &ldquo;COBB&rdquo; and &ldquo;AccessPORT&rdquo; are trademarks of their
+      respective owners, used here only to identify the hardware this project
+      works with. See
+      <a href="https://github.com/noelmom/revlink-sidecar/blob/main/NOTICE">NOTICE</a>.
+    </p>
+    <p class="fine">
+      Modifying a vehicle may affect its warranty, emissions compliance, and
+      legal road status. That's on you. Provided without warranty of any kind.
+    </p>
+  </footer>
+
+</main>
+</body>
+</html>

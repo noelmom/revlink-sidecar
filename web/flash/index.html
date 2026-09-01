@@ -45,12 +45,54 @@
     </ol>
   </section>
 
+  <section class="panel">
+    <h2>Which port do I pick?</h2>
+    <p>
+      Your browser will ask permission and show every serial port on the
+      machine. The Sidecar is the one named <strong>USB Single Serial</strong>.
+      On macOS it appears as <code>cu.usbmodem…</code>, on Windows as a
+      <code>COM</code> port.
+    </p>
+
+    <figure class="picker" aria-label="Example of the browser's serial port chooser">
+      <div class="picker-title">wants to connect to a serial port</div>
+      <ul class="picker-list">
+        <li>cu.Bluetooth-Incoming-Port</li>
+        <li>cu.debug-console</li>
+        <li class="pick">
+          USB Single Serial (cu.usbmodem…)
+          <span class="pick-tag">this one</span>
+        </li>
+        <li>cu.wlan-debug</li>
+      </ul>
+      <div class="picker-buttons">
+        <span class="picker-btn">Cancel</span>
+        <span class="picker-btn primary">Connect</span>
+      </div>
+    </figure>
+
+    <p class="fine">
+      The trailing digits differ on every machine — match the
+      <strong>USB Single Serial</strong> name, not the exact number. If you see
+      no such entry, the cable is charge-only or the board isn't in download
+      mode.
+    </p>
+  </section>
+
   <section class="panel actions">
     <div class="row">
       <button id="connect" type="button" class="primary">Connect</button>
       <button id="flash" type="button" disabled>Flash</button>
       <button id="disconnect" type="button" disabled>Disconnect</button>
     </div>
+    <label class="speed">
+      Transfer speed
+      <select id="baud">
+        <option value="115200" selected>115200 — most reliable</option>
+        <option value="230400">230400 — faster</option>
+        <option value="460800">460800 — fastest, may drop</option>
+      </select>
+    </label>
     <p id="status" class="status">Loading…</p>
     <div id="progress" class="progress" hidden><div id="bar" class="bar"></div></div>
   </section>
@@ -94,6 +136,12 @@
       Something not right?
       <a href="https://github.com/noelmom/revlink-sidecar/issues">Open an issue</a>
       — include the log below.
+    </p>
+    <p class="fine">
+      If a write stops partway with the board still attached, drop the
+      transfer speed and press Flash again. You do not need to reconnect, and
+      a half-written board is not a broken one — the bootloader lives in ROM,
+      so you can always retry.
     </p>
   </section>
 

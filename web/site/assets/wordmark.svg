@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 68" role="img" aria-labelledby="title">
+  <title id="title">RevLink</title>
+  <path
+    d="M57 17C107 1.8 205 1.8 260 17"
+    fill="none"
+    stroke="#356dff"
+    stroke-linecap="round"
+    stroke-width="3"
+  />
+  <g fill="#f6f4ef">
+    <path
+      fill-rule="evenodd"
+      d="M8 25h21c9.1 0 14.7 4.6 14.7 11.9 0 5.6-3.4 9.5-9.4 11l11 13.1H34.6l-9.3-11.7H17V61H8V25Zm9 7v10.2h11.6c3.8 0 6-1.8 6-5.1 0-3.2-2.2-5.1-6-5.1H17Z"
+    />
+    <path d="M52 25h35v7H61v7.2h23v7H61V54h26v7H52V25Z"/>
+    <path d="M94 25h9.7l12.1 26.2L128 25h9.7l-17.3 36h-9.1L94 25Z"/>
+    <path d="M145 25h9v29h24v7h-33V25Z"/>
+    <path d="M186 25h9v36h-9V25Z"/>
+    <path d="M204 25h9l18.5 23.2V25h9v36h-8.8L213 37.6V61h-9V25Z"/>
+    <path d="M250 25h9v14.2L273.2 25h11.1l-16.1 16 17 20h-11.1l-12.2-14.3-2.9 2.9V61h-9V25Z"/>
+  </g>
+</svg>

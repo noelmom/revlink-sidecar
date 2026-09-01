@@ -3,6 +3,15 @@ import { evaluateGate, parseRevision } from "./gate.js";
 
 const RELEASE = "firmware/v0.1.0-nano-readonly";
 
+/*
+ * Transfer speed. A USB-serial bridge that syncs happily at 460800 can
+ * still drop bytes once a sustained megabyte is moving through it, which
+ * shows up as a write that dies partway with the board still attached.
+ * Default to the conservative rate and let the impatient opt up.
+ */
+const selectedBaud = () =>
+  Number(document.getElementById("baud")?.value) || 115200;
+
 const el = (id) => document.getElementById(id);
 const ui = {
   support: el("support"),
@@ -16,6 +25,7 @@ const ui = {
   bar: el("bar"),
   log: el("log"),
   release: el("release"),
+  baud: el("baud"),
 };
 
 let manifest = null;
@@ -168,7 +178,7 @@ async function connect() {
     transport = new Transport(port, true);
     esploader = new ESPLoader({
       transport,
-      baudrate: 460800,
+      baudrate: selectedBaud(),
       romBaudrate: 115200,
       terminal,
       enableTracing: false,
@@ -258,8 +268,12 @@ async function flash() {
   } catch (error) {
     status(describe(error), "error");
     log(String(error?.stack || error));
+    // The board is still attached and still in the bootloader after a failed
+    // write, so allow another attempt without reconnecting.
+    ui.flash.disabled = !gateOk;
   } finally {
     ui.disconnect.disabled = false;
+    ui.connect.disabled = esploader !== null;
   }
 }
 

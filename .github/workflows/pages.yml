@@ -38,9 +38,19 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # Assemble the site: landing page at /, flasher at /flash/.
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r web/site/. _site/
+          mkdir -p _site/flash
+          cp -r web/flash/. _site/flash/
+          rm -f _site/flash/README.md _site/flash/gate.test.mjs
+          find _site -type f | sort
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web/flash
+          path: _site
 
       - id: deployment
         uses: actions/deploy-pages@v4
