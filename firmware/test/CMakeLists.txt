@@ -5,6 +5,13 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+# Strict -std=c11 hides POSIX declarations on glibc, so strnlen() resolves as
+# an implicit declaration and -Werror rejects it. ESP-IDF's newlib exposes it
+# unconditionally, and so does Apple libc, which is why this only surfaces on
+# Linux/GCC. Request the POSIX 2008 feature set for the host build instead of
+# relaxing the standard to gnu11.
+add_compile_definitions(_POSIX_C_SOURCE=200809L)
+
 add_library(
     revlink_accessport_protocol
     ../components/accessport_protocol/revlink_accessport_protocol.c
