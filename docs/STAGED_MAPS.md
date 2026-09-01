@@ -94,7 +94,9 @@ The preference persists in NVS. Portal status reports `autoApply`, `pinned`,
 and `targetPartNumber` under `mapUpload`.
 
 > [!IMPORTANT]
-> Automatic map writing has not been accepted against real hardware. The
-> controlled round-trip in [`MAP_WRITE_ACCEPTANCE.md`](MAP_WRITE_ACCEPTANCE.md)
-> must be completed first. Until then this path is implemented and
-> host-tested, not proven.
+> Writing a map to an AccessPort is a proven path — see
+> [`MAP_WRITE_ACCEPTANCE.md`](MAP_WRITE_ACCEPTANCE.md). What is new here is the
+> Sidecar deciding to perform one unattended, after a sync, with nobody
+> pressing anything. That trigger has been exercised only in host tests.
+> Staging, persistence across a power cycle, and the device pin have been
+> accepted on hardware.

@@ -6,9 +6,11 @@ plug into a vehicle. Please do not relax them casually in a pull request.
 
 ## The one-sentence version
 
-Reading is safe and enabled. Writing is off by default, requires two
-independent unlocks, is restricted to two exact destinations, and refuses to
-proceed the moment anything is ambiguous.
+Reading is safe and enabled. Writing works and has been done against real
+hardware, but it is off by default, requires two independent unlocks, is
+restricted to two exact destinations, and refuses to proceed the moment
+anything is ambiguous. What is genuinely new is RevLink starting a write
+without being asked; see automatic application below.
 
 ## Read vs. write
 
@@ -97,13 +99,21 @@ Claims here are limited to what has been verified on a real device.
 - A map staged with no AccessPort attached, surviving a power cycle: restored
   at boot with its recorded size and SHA-256 re-verified, and still pinned to
   the part number it was saved for
+- Writing a map to an AccessPort. On the first live pass the device accepted
+  the file and a later read-only session recovered the exact bytes and digest.
+  That pass reported a misleading `ESP_ERR_INVALID_CRC` only because the local
+  cache's path validator rejected spaces in map names; the transfer itself had
+  already completed. Validators now accept safe spaces and parentheses, with
+  host tests covering those names. See docs/MAP_WRITE_ACCEPTANCE.md
 
 **Not yet accepted on hardware:**
 
-- Live map upload round-trip against a device
-- Automatic application of a staged map on attach. Staging, persistence and
-  the pin are accepted above; what remains unproven is the write itself,
-  which is the same unproven path as a manual map upload
+- RevLink starting a write on its own. Automatic application of a staged map
+  fires after a sync with nobody pressing anything, and that trigger has only
+  been exercised in host tests. The write it performs is the accepted one
+  above; what is new is the decision to perform it
+- The full ceremonial round-trip in docs/MAP_WRITE_ACCEPTANCE.md — listing
+  before and after, and the delete step — has not been completed end to end
 - Startup-screen replacement against a device
 - Powered-hub behavior with two AccessPorts attached
 - Cooperative cancellation and shutdown *during* an active sync
