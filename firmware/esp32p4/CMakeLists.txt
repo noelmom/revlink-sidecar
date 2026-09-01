@@ -23,4 +23,10 @@ idf_build_set_property(
     APPEND
 )
 
+# Take the firmware version from version.txt rather than letting ESP-IDF fall
+# back to `git describe`. That fallback reported a release as
+# "v0.1.0-10-gd7c5a13" — honest about the commit, but describing it against a
+# stale tag and disagreeing with every other place the version appears. It
+# also makes the version depend on git state, so a build from a tarball or a
+# shallow clone reports something different again.
 project(revlink_esp32p4)
