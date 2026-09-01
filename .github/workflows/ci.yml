@@ -1,20 +1,11 @@
 name: CI
 
-# GitHub-hosted runners are free and unlimited for PUBLIC repositories, but
-# bill against a monthly minute allowance while a repository is private. This
-# repository is private for now, so automatic runs are switched off and
-# `scripts/ci-local.sh` is the checked-in equivalent that maintainers run.
-#
-# When this repository goes public, restore automatic CI by replacing the
-# `on:` block below with:
-#
-#   on:
-#     push:
-#       branches: [main]
-#     pull_request:
-#
-# Until then it can still be started by hand from the Actions tab.
+# GitHub-hosted runners are free and unlimited for public repositories.
+# scripts/ci-local.sh runs the same checks on a developer machine.
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:

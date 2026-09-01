@@ -1,0 +1,46 @@
+name: Deploy flasher
+
+# Publishes web/flash to GitHub Pages. Pages can only serve a repository root
+# or /docs when deploying from a branch, so the flasher is uploaded as an
+# artifact instead.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/flash/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deployments race; let an in-flight one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # The page verifies every binary against manifest.json before writing to
+      # a board. Verify the same thing here so a bad artifact is never
+      # published in the first place.
+      - name: Verify release manifest and flasher gate
+        run: node --test web/flash/gate.test.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/flash
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
