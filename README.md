@@ -88,9 +88,11 @@ tried and retired — the full write-up is in
 
 ## Install
 
-**Easiest — flash from your browser.** Open the flasher page in Chrome or
-Edge, plug the board in over USB-C, and click Flash. No toolchain, no command
-line. It reads the board's silicon revision first and refuses to write an
+**Easiest — flash from your browser:
+[noelmom.github.io/revlink-sidecar](https://noelmom.github.io/revlink-sidecar/)**
+
+Open it in Chrome or Edge, plug the board in over USB-C, and click Flash. No
+toolchain, no command line. It reads the board's silicon revision first and refuses to write an
 image built for the other P4 variant.
 
 The published image is **read-only**: it lists, downloads, verifies, and
