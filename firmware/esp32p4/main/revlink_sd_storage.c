@@ -1734,14 +1734,14 @@ static esp_err_t load_sync_manifest(void)
         return ESP_FAIL;
     }
 
-    const revlink_sync_status_t parse_status =
+    const revlink_sync_manifest_status_t parse_status =
         revlink_sync_manifest_parse(contents, count, sync_manifest);
     free(contents);
-    if (parse_status != REVLINK_SYNC_OK) {
+    if (parse_status != REVLINK_SYNC_MANIFEST_OK) {
         ESP_LOGE(
             TAG,
             "Refusing corrupt sync manifest: %s",
-            revlink_sync_status_name(parse_status)
+            revlink_sync_manifest_status_name(parse_status)
         );
         return ESP_ERR_INVALID_RESPONSE;
     }
@@ -1769,19 +1769,19 @@ static esp_err_t save_sync_manifest(
         return ESP_ERR_NO_MEM;
     }
     size_t serialized_length = 0U;
-    const revlink_sync_status_t serialize_status =
+    const revlink_sync_manifest_status_t serialize_status =
         revlink_sync_manifest_serialize(
             candidate,
             serialized,
             REVLINK_SD_MANIFEST_MAX_BYTES,
             &serialized_length
         );
-    if (serialize_status != REVLINK_SYNC_OK) {
+    if (serialize_status != REVLINK_SYNC_MANIFEST_OK) {
         free(serialized);
         ESP_LOGE(
             TAG,
             "Unable to serialize sync manifest: %s",
-            revlink_sync_status_name(serialize_status)
+            revlink_sync_manifest_status_name(serialize_status)
         );
         return ESP_ERR_INVALID_SIZE;
     }
@@ -2249,14 +2249,14 @@ static esp_err_t load_sync_history(void)
         free(contents);
         return ESP_FAIL;
     }
-    const revlink_sync_status_t parse_status =
+    const revlink_sync_manifest_status_t parse_status =
         revlink_sync_history_parse(contents, count, sync_history);
     free(contents);
-    if (parse_status != REVLINK_SYNC_OK) {
+    if (parse_status != REVLINK_SYNC_MANIFEST_OK) {
         ESP_LOGE(
             TAG,
             "Refusing corrupt version history: %s",
-            revlink_sync_status_name(parse_status)
+            revlink_sync_manifest_status_name(parse_status)
         );
         return ESP_ERR_INVALID_RESPONSE;
     }
@@ -2282,14 +2282,14 @@ static esp_err_t save_sync_history(const revlink_sync_history_t *candidate)
         return ESP_ERR_NO_MEM;
     }
     size_t serialized_length = 0U;
-    const revlink_sync_status_t serialize_status =
+    const revlink_sync_manifest_status_t serialize_status =
         revlink_sync_history_serialize(
             candidate,
             serialized,
             REVLINK_SD_HISTORY_MAX_BYTES,
             &serialized_length
         );
-    if (serialize_status != REVLINK_SYNC_OK) {
+    if (serialize_status != REVLINK_SYNC_MANIFEST_OK) {
         free(serialized);
         return ESP_ERR_INVALID_SIZE;
     }
@@ -3742,7 +3742,7 @@ esp_err_t revlink_sd_download_commit(void *context)
     *history_candidate = *sync_history;
     uint32_t history_sequence = 0U;
     const uint64_t initial_sync_utc = trusted_time_now();
-    const revlink_sync_status_t history_status =
+    const revlink_sync_manifest_status_t history_status =
         revlink_sync_history_record_at(
             history_candidate,
             (const uint8_t *)download_writer.device_path,
@@ -3754,12 +3754,12 @@ esp_err_t revlink_sd_download_commit(void *context)
             object_name,
             &history_sequence
         );
-    if (history_status != REVLINK_SYNC_OK
+    if (history_status != REVLINK_SYNC_MANIFEST_OK
         || save_sync_history(history_candidate) != ESP_OK) {
         ESP_LOGE(
             TAG,
             "Immutable object preserved but history publication failed: %s",
-            revlink_sync_status_name(history_status)
+            revlink_sync_manifest_status_name(history_status)
         );
         free(history_candidate);
         free(manifest_candidate);
@@ -3770,7 +3770,7 @@ esp_err_t revlink_sd_download_commit(void *context)
     free(history_candidate);
 
     *manifest_candidate = *sync_manifest;
-    const revlink_sync_status_t manifest_status =
+    const revlink_sync_manifest_status_t manifest_status =
         revlink_sync_manifest_upsert_at(
             manifest_candidate,
             (const uint8_t *)download_writer.device_path,
@@ -3781,12 +3781,12 @@ esp_err_t revlink_sd_download_commit(void *context)
             digest,
             object_name
         );
-    if (manifest_status != REVLINK_SYNC_OK
+    if (manifest_status != REVLINK_SYNC_MANIFEST_OK
         || save_sync_manifest(manifest_candidate) != ESP_OK) {
         ESP_LOGE(
             TAG,
             "Object and history preserved but current manifest failed: %s",
-            revlink_sync_status_name(manifest_status)
+            revlink_sync_manifest_status_name(manifest_status)
         );
         free(manifest_candidate);
         memset(&download_writer, 0, sizeof(download_writer));

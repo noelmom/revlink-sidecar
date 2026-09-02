@@ -10,29 +10,29 @@ static int sync_cancels;
 static int sync_observer_calls;
 static int sync_request_failures_remaining;
 
-static revlink_sync_status_t request_sync(void *context)
+static revlink_sync_coordinator_status_t request_sync(void *context)
 {
     (void)context;
     ++sync_requests;
     if (sync_request_failures_remaining > 0) {
         --sync_request_failures_remaining;
-        return REVLINK_SYNC_TRANSPORT_ERROR;
+        return REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR;
     }
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_COORDINATOR_OK;
 }
 
-static revlink_sync_status_t recover_session(void *context)
+static revlink_sync_coordinator_status_t recover_session(void *context)
 {
     (void)context;
     ++sync_recoveries;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_COORDINATOR_OK;
 }
 
-static revlink_sync_status_t cancel_sync(void *context)
+static revlink_sync_coordinator_status_t cancel_sync(void *context)
 {
     (void)context;
     ++sync_cancels;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_COORDINATOR_OK;
 }
 
 static void count_sync_observer(
@@ -130,7 +130,7 @@ static void test_bounded_auto_sync_retry(void)
         "transient queue failure exposes one bounded retry"
     );
     require_true(
-        revlink_application_retry_auto_sync(&queue_race) == REVLINK_SYNC_OK
+        revlink_application_retry_auto_sync(&queue_race) == REVLINK_SYNC_COORDINATOR_OK
             && sync_requests == request_base + 2,
         "bounded queue-race retry succeeds"
     );
@@ -180,7 +180,7 @@ static void test_bounded_auto_sync_retry(void)
     };
     require_true(
         revlink_application_handle_sync_event(&early_failure, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "auto-retry early-failure sync start"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -195,13 +195,13 @@ static void test_bounded_auto_sync_retry(void)
     };
     require_true(
         revlink_application_handle_sync_event(&early_failure, &sync_event)
-            == REVLINK_SYNC_OK
+            == REVLINK_SYNC_COORDINATOR_OK
             && revlink_application_auto_sync_retry_needed(&early_failure),
         "zero-byte early transport failure exposes one bounded retry"
     );
     require_true(
         revlink_application_retry_auto_sync(&early_failure)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "bounded early transport retry succeeds"
     );
 }
@@ -276,7 +276,7 @@ static void require_conflict_for_enumeration_order(
     );
     require_true(
         revlink_application_request_sync(&application)
-            == REVLINK_SYNC_INVALID_STATE,
+            == REVLINK_SYNC_COORDINATOR_INVALID_STATE,
         "enumeration-order conflict blocks manual sync"
     );
 }
@@ -529,7 +529,7 @@ int main(void)
     );
     require_true(sync_requests == 0, "auto-sync must default off");
     require_true(
-        revlink_application_request_sync(&application) == REVLINK_SYNC_OK,
+        revlink_application_request_sync(&application) == REVLINK_SYNC_COORDINATOR_OK,
         "manual sync request"
     );
     require_true(sync_requests == 1, "manual request transport call");
@@ -538,7 +538,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&application, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "sync started"
     );
     sync_event = (revlink_sync_event_t){
@@ -551,7 +551,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&application, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "sync progress"
     );
     sync_event.kind = REVLINK_SYNC_EVENT_COMPLETED;
@@ -560,7 +560,7 @@ int main(void)
     sync_event.session_close_acknowledged = true;
     require_true(
         revlink_application_handle_sync_event(&application, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "sync completed"
     );
     const revlink_sync_snapshot_t sync_snapshot =
@@ -575,11 +575,11 @@ int main(void)
         "sync progress snapshot"
     );
     require_true(
-        revlink_application_request_sync(&application) == REVLINK_SYNC_OK,
+        revlink_application_request_sync(&application) == REVLINK_SYNC_COORDINATOR_OK,
         "repeat manual sync"
     );
     require_true(
-        revlink_application_cancel_sync(&application) == REVLINK_SYNC_OK,
+        revlink_application_cancel_sync(&application) == REVLINK_SYNC_COORDINATOR_OK,
         "cancel queued sync"
     );
     require_true(sync_cancels == 1, "cancel transport call");
@@ -588,13 +588,13 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&application, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "cancelled queued sync may start cooperatively"
     );
     sync_event.kind = REVLINK_SYNC_EVENT_CANCELLED;
     require_true(
         revlink_application_handle_sync_event(&application, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "sync cancelled"
     );
     require_true(
@@ -727,7 +727,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&automatic, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "automatic sync start"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -739,7 +739,7 @@ int main(void)
     sync_event.kind = REVLINK_SYNC_EVENT_COMPLETED;
     require_true(
         revlink_application_handle_sync_event(&automatic, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "automatic sync completion"
     );
     require_true(sync_requests == 3, "session close must not auto-loop");
@@ -772,7 +772,7 @@ int main(void)
 
     for (uint8_t cycle = 0; cycle < 10U; ++cycle) {
         require_true(
-            revlink_application_request_sync(&automatic) == REVLINK_SYNC_OK,
+            revlink_application_request_sync(&automatic) == REVLINK_SYNC_COORDINATOR_OK,
             "repeat-cycle manual sync request"
         );
         event.kind = REVLINK_DEVICE_EVENT_SESSION_OPENED;
@@ -787,7 +787,7 @@ int main(void)
         };
         require_true(
             revlink_application_handle_sync_event(&automatic, &sync_event)
-                == REVLINK_SYNC_OK,
+                == REVLINK_SYNC_COORDINATOR_OK,
             "repeat-cycle sync start"
         );
         event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -803,7 +803,7 @@ int main(void)
         };
         require_true(
             revlink_application_handle_sync_event(&automatic, &sync_event)
-                == REVLINK_SYNC_OK,
+                == REVLINK_SYNC_COORDINATOR_OK,
             "repeat-cycle sync completion"
         );
 
@@ -895,7 +895,7 @@ int main(void)
     const int recovery_request_base = sync_requests;
     const int recovery_attempt_base = sync_recoveries;
     require_true(
-        revlink_application_request_sync(&recovery) == REVLINK_SYNC_OK,
+        revlink_application_request_sync(&recovery) == REVLINK_SYNC_COORDINATOR_OK,
         "recovery initial request"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_OPENED;
@@ -909,7 +909,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "recovery initial sync start"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -927,7 +927,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "unclean close queues one complete recovery session"
     );
     require_true(
@@ -953,7 +953,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "recovery retry sync start"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -972,7 +972,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "second unclean close is terminal"
     );
     require_true(
@@ -987,7 +987,7 @@ int main(void)
     );
 
     require_true(
-        revlink_application_request_sync(&recovery) == REVLINK_SYNC_OK,
+        revlink_application_request_sync(&recovery) == REVLINK_SYNC_COORDINATOR_OK,
         "new explicit sync resets recovery budget"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_OPENED;
@@ -1001,7 +1001,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "new explicit sync start"
     );
     event.kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED;
@@ -1019,7 +1019,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&recovery, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "data-phase failure remains terminal"
     );
     require_true(
@@ -1086,7 +1086,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&conflict, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "conflict pinned sync starts"
     );
     event = (revlink_device_event_t){
@@ -1112,7 +1112,7 @@ int main(void)
     );
     require_true(
         revlink_application_request_sync(&conflict)
-            == REVLINK_SYNC_INVALID_STATE,
+            == REVLINK_SYNC_COORDINATOR_INVALID_STATE,
         "manual sync is blocked during conflict"
     );
     require_true(
@@ -1138,7 +1138,7 @@ int main(void)
     };
     require_true(
         revlink_application_handle_sync_event(&conflict, &sync_event)
-            == REVLINK_SYNC_OK,
+            == REVLINK_SYNC_COORDINATOR_OK,
         "conflicted read-only sync finishes cancellation"
     );
     event = (revlink_device_event_t){
@@ -1183,7 +1183,7 @@ int main(void)
         "auto-sync remains disarmed after conflict recovery"
     );
     require_true(
-        revlink_application_request_sync(&conflict) == REVLINK_SYNC_OK
+        revlink_application_request_sync(&conflict) == REVLINK_SYNC_COORDINATOR_OK
             && sync_requests == conflict_request_base + 2,
         "explicit customer sync recovers normal operation"
     );

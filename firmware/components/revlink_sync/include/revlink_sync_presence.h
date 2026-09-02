@@ -18,9 +18,14 @@ extern "C" {
  *
  * This lives in a header of its own so that surfaces which only need to
  * report presence — the portal projection, for one — do not have to include
- * the whole manifest interface. revlink_sync_manifest.h and
- * revlink_sync_coordinator.h each define an unrelated revlink_sync_status_t,
- * and pulling both into one translation unit does not compile.
+ * the whole manifest interface.
+ *
+ * It was originally split out to dodge a name collision: revlink_sync_manifest.h
+ * and revlink_sync_coordinator.h both defined a revlink_sync_status_t, with
+ * different enumerators, so no translation unit could include both. That is
+ * fixed — the two are now revlink_sync_manifest_status_t and
+ * revlink_sync_coordinator_status_t — and this header stays on its own merits
+ * rather than as a workaround.
  */
 typedef enum {
     REVLINK_SYNC_PRESENCE_UNKNOWN = 0,

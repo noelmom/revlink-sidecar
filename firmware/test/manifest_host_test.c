@@ -39,7 +39,7 @@ int main(void)
             1785168000U,
             first_digest,
             "datalog35.csv"
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "initial upsert"
     );
     const revlink_sync_manifest_entry_t *entry =
@@ -73,7 +73,7 @@ int main(void)
             serialized,
             sizeof(serialized),
             &serialized_length
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "serialize"
     );
     revlink_sync_manifest_t parsed;
@@ -82,7 +82,7 @@ int main(void)
             serialized,
             serialized_length,
             &parsed
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "round-trip parse"
     );
     entry = revlink_sync_manifest_find(&parsed, path, sizeof(path) - 1U);
@@ -106,7 +106,7 @@ int main(void)
             1785169999U,
             first_digest,
             "datalog35.csv"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && revlink_sync_manifest_find(
                 &parsed,
                 path,
@@ -127,7 +127,7 @@ int main(void)
             1785169000U,
             replacement_digest,
             "datalog35.csv.sha256-80818283"
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "conflict replacement"
     );
     require_true(parsed.count == 1U, "upsert must replace by device path");
@@ -147,7 +147,7 @@ int main(void)
             serialized,
             serialized_length - 1U,
             &parsed
-        ) == REVLINK_SYNC_INVALID_FORMAT,
+        ) == REVLINK_SYNC_MANIFEST_INVALID_FORMAT,
         "truncated snapshot must be rejected"
     );
     static const char legacy_manifest[] =
@@ -161,7 +161,7 @@ int main(void)
             legacy_manifest,
             sizeof(legacy_manifest) - 1U,
             &parsed
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && parsed.entries[0].initial_sync_utc == 0U,
         "v1 manifest migrates without inventing Initial sync"
     );
@@ -192,7 +192,7 @@ int main(void)
                     (uint32_t)index + 100U,
                     first_digest,
                     cache_name
-                ) == REVLINK_SYNC_OK,
+                ) == REVLINK_SYNC_MANIFEST_OK,
             "fill manifest capacity"
         );
     }
@@ -206,7 +206,7 @@ int main(void)
             1U,
             first_digest,
             "overflow.csv"
-        ) == REVLINK_SYNC_CAPACITY_EXCEEDED,
+        ) == REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED,
         "manifest capacity must be bounded"
     );
 
@@ -217,7 +217,7 @@ int main(void)
             serialized,
             16U,
             &required_length
-        ) == REVLINK_SYNC_BUFFER_TOO_SMALL
+        ) == REVLINK_SYNC_MANIFEST_BUFFER_TOO_SMALL
             && required_length > 16U,
         "serialization capacity must be bounded"
     );
@@ -244,7 +244,7 @@ int main(void)
             first_digest,
             "10111213.csv",
             &first_sequence
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && first_sequence == 1U,
         "record first immutable version"
     );
@@ -259,7 +259,7 @@ int main(void)
             first_digest,
             "10111213.csv",
             &repeated_sequence
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && repeated_sequence == first_sequence
             && history->count == 1U
             && history->entries[0].initial_sync_utc == 1785168000U,
@@ -276,7 +276,7 @@ int main(void)
             replacement_digest,
             "80818283.csv",
             &rotated_sequence
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && rotated_sequence == 2U
             && history->count == 2U,
         "rotated filename must preserve a second version"
@@ -293,7 +293,7 @@ int main(void)
             replacement_digest,
             "80818283.csv",
             &renamed_sequence
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && renamed_sequence == 3U
             && history->count == 3U,
         "same object under a new path keeps a separate reference"
@@ -308,7 +308,7 @@ int main(void)
             history_text,
             300000U,
             &history_length
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "serialize history"
     );
     require_true(
@@ -316,7 +316,7 @@ int main(void)
             history_text,
             history_length,
             parsed_history
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && parsed_history->count == 3U
             && parsed_history->next_sequence == 4U,
         "parse history"
@@ -350,7 +350,7 @@ int main(void)
             replacement_digest,
             "80818283.csv",
             &other_sequence
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && other_sequence == 1U
             && other_device->count == 1U
             && history->count == 3U,
@@ -378,7 +378,7 @@ int main(void)
             history_text,
             history_length - 1U,
             parsed_history
-        ) == REVLINK_SYNC_INVALID_FORMAT,
+        ) == REVLINK_SYNC_MANIFEST_INVALID_FORMAT,
         "truncated history must be rejected"
     );
     static const char legacy_history[] =
@@ -391,7 +391,7 @@ int main(void)
             legacy_history,
             sizeof(legacy_history) - 1U,
             parsed_history
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && parsed_history->entries[0].initial_sync_utc == 0U,
         "v1 history migrates without inventing Initial sync"
     );
@@ -409,7 +409,7 @@ int main(void)
             1785330000U,
             first_digest,
             "10111213.ptm"
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "map paths may contain safe spaces and parentheses"
     );
     uint32_t spaced_sequence = 0U;
@@ -424,7 +424,7 @@ int main(void)
             first_digest,
             "10111213.ptm",
             &spaced_sequence
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "map history accepts safe spaces and parentheses"
     );
     free(history_text);
@@ -575,7 +575,7 @@ int main(void)
             2048U,
             presence_digest,
             "stage1.ptm"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && presence->entries[0].presence
                 == REVLINK_SYNC_PRESENCE_UNKNOWN,
         "a new entry claims nothing about the device"
@@ -615,7 +615,7 @@ int main(void)
             2048U,
             presence_digest,
             "stage1.ptm"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && presence->entries[0].presence
                 == REVLINK_SYNC_PRESENCE_ON_DEVICE,
         "re-syncing a file does not discard its presence"
@@ -640,7 +640,7 @@ int main(void)
             presence_text,
             65536U,
             &presence_length
-        ) == REVLINK_SYNC_OK,
+        ) == REVLINK_SYNC_MANIFEST_OK,
         "presence manifest serializes"
     );
     revlink_sync_manifest_t *reloaded = calloc(1U, sizeof(*reloaded));
@@ -650,7 +650,7 @@ int main(void)
             presence_text,
             presence_length,
             reloaded
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && reloaded->count == 1U
             && reloaded->entries[0].presence == REVLINK_SYNC_PRESENCE_ABSENT,
         "presence survives a save and reload"
@@ -671,7 +671,7 @@ int main(void)
             legacy_v2_manifest,
             sizeof(legacy_v2_manifest) - 1U,
             reloaded
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
             && reloaded->count == 1U
             && reloaded->entries[0].presence
                 == REVLINK_SYNC_PRESENCE_UNKNOWN,
@@ -687,7 +687,7 @@ int main(void)
             bad_presence,
             sizeof(bad_presence) - 1U,
             reloaded
-        ) == REVLINK_SYNC_INVALID_FORMAT,
+        ) == REVLINK_SYNC_MANIFEST_INVALID_FORMAT,
         "an unrecognised presence value is refused, not guessed at"
     );
     free(reloaded);
@@ -712,15 +712,15 @@ int main(void)
         revlink_sync_manifest_upsert(
             removal, (const uint8_t *)"maps/A.ptm", 10U,
             1U, 64U, shared_digest, "a.ptm"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
         && revlink_sync_manifest_upsert(
             removal, (const uint8_t *)"maps/B.ptm", 10U,
             2U, 64U, shared_digest, "b.ptm"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
         && revlink_sync_manifest_upsert(
             removal, (const uint8_t *)"maps/C.ptm", 10U,
             3U, 64U, lone_digest, "c.ptm"
-        ) == REVLINK_SYNC_OK
+        ) == REVLINK_SYNC_MANIFEST_OK
         && removal->count == 3U,
         "three entries, two of them sharing one digest"
     );

@@ -23,7 +23,7 @@ static bool sync_state_is_active(revlink_sync_state_t state)
         || state == REVLINK_SYNC_CANCELLING;
 }
 
-static revlink_sync_status_t request_automatic_sync(
+static revlink_sync_coordinator_status_t request_automatic_sync(
     revlink_application_t *application,
     bool retry
 )
@@ -32,10 +32,10 @@ static revlink_sync_status_t request_automatic_sync(
         ++application->auto_sync_retry_count;
     }
     application->auto_sync_retry_eligible = false;
-    const revlink_sync_status_t status = revlink_sync_coordinator_request(
+    const revlink_sync_coordinator_status_t status = revlink_sync_coordinator_request(
         &application->sync_coordinator
     );
-    if (status == REVLINK_SYNC_OK) {
+    if (status == REVLINK_SYNC_COORDINATOR_OK) {
         application->auto_sync_attempted = true;
         application->auto_sync_active = true;
         application->unclean_close_recovery_attempted = false;
@@ -135,7 +135,7 @@ revlink_core_status_t revlink_application_init(
             &application->sync_coordinator,
             &sync_config,
             &config->sync_policy
-        ) != REVLINK_SYNC_OK) {
+        ) != REVLINK_SYNC_COORDINATOR_OK) {
         return REVLINK_CORE_INVALID_ARGUMENT;
     }
     revlink_device_service_init(
@@ -232,19 +232,19 @@ revlink_core_status_t revlink_application_authorize(
     );
 }
 
-revlink_sync_status_t revlink_application_set_sync_policy(
+revlink_sync_coordinator_status_t revlink_application_set_sync_policy(
     revlink_application_t *application,
     const revlink_sync_policy_t *policy
 )
 {
     if (application == NULL || policy == NULL) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT;
     }
-    const revlink_sync_status_t status = revlink_sync_coordinator_set_policy(
+    const revlink_sync_coordinator_status_t status = revlink_sync_coordinator_set_policy(
         &application->sync_coordinator,
         policy
     );
-    if (status == REVLINK_SYNC_OK && !policy->auto_sync_on_attach) {
+    if (status == REVLINK_SYNC_COORDINATOR_OK && !policy->auto_sync_on_attach) {
         application->auto_sync_active = false;
         application->auto_sync_retry_eligible = false;
     }
@@ -264,22 +264,22 @@ revlink_sync_policy_t revlink_application_sync_policy(
     );
 }
 
-revlink_sync_status_t revlink_application_request_sync(
+revlink_sync_coordinator_status_t revlink_application_request_sync(
     revlink_application_t *application
 )
 {
     if (application == NULL) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT;
     }
     const revlink_device_snapshot_t device =
         revlink_device_service_snapshot(&application->device_service);
     if (device.state != REVLINK_DEVICE_AVAILABLE) {
-        return REVLINK_SYNC_INVALID_STATE;
+        return REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     }
-    const revlink_sync_status_t status = revlink_sync_coordinator_request(
+    const revlink_sync_coordinator_status_t status = revlink_sync_coordinator_request(
         &application->sync_coordinator
     );
-    if (status == REVLINK_SYNC_OK) {
+    if (status == REVLINK_SYNC_COORDINATOR_OK) {
         application->auto_sync_attempted = true;
         application->auto_sync_active = false;
         application->auto_sync_retry_eligible = false;
@@ -310,45 +310,45 @@ bool revlink_application_auto_sync_retry_needed(
         && !sync_state_is_active(sync.state);
 }
 
-revlink_sync_status_t revlink_application_retry_auto_sync(
+revlink_sync_coordinator_status_t revlink_application_retry_auto_sync(
     revlink_application_t *application
 )
 {
     if (application == NULL) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT;
     }
     if (!revlink_application_auto_sync_retry_needed(application)) {
-        return REVLINK_SYNC_INVALID_STATE;
+        return REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     }
     return request_automatic_sync(application, true);
 }
 
-revlink_sync_status_t revlink_application_cancel_sync(
+revlink_sync_coordinator_status_t revlink_application_cancel_sync(
     revlink_application_t *application
 )
 {
     if (application == NULL) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT;
     }
     return revlink_sync_coordinator_cancel(
         &application->sync_coordinator
     );
 }
 
-revlink_sync_status_t revlink_application_handle_sync_event(
+revlink_sync_coordinator_status_t revlink_application_handle_sync_event(
     revlink_application_t *application,
     const revlink_sync_event_t *event
 )
 {
     if (application == NULL || event == NULL) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT;
     }
-    const revlink_sync_status_t status =
+    const revlink_sync_coordinator_status_t status =
         revlink_sync_coordinator_handle_event(
         &application->sync_coordinator,
         event
     );
-    if (status != REVLINK_SYNC_OK) {
+    if (status != REVLINK_SYNC_COORDINATOR_OK) {
         return status;
     }
 
@@ -376,14 +376,14 @@ revlink_sync_status_t revlink_application_handle_sync_event(
     if (!application->retry_unclean_readonly_close_once
         || !recoverable_close_failure
         || application->unclean_close_recovery_attempted) {
-        return REVLINK_SYNC_OK;
+        return REVLINK_SYNC_COORDINATOR_OK;
     }
 
     const revlink_device_snapshot_t device =
         revlink_device_service_snapshot(&application->device_service);
     if (device.state != REVLINK_DEVICE_AVAILABLE
         || device.conflict_recovery_required) {
-        return REVLINK_SYNC_OK;
+        return REVLINK_SYNC_COORDINATOR_OK;
     }
 
     application->unclean_close_recovery_attempted = true;

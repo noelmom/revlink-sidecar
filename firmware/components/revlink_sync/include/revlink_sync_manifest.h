@@ -17,13 +17,13 @@ extern "C" {
 #define REVLINK_SYNC_SHA256_BYTES 32U
 
 typedef enum {
-    REVLINK_SYNC_OK = 0,
-    REVLINK_SYNC_INVALID_ARGUMENT,
-    REVLINK_SYNC_INVALID_FORMAT,
-    REVLINK_SYNC_CAPACITY_EXCEEDED,
-    REVLINK_SYNC_BUFFER_TOO_SMALL,
-    REVLINK_SYNC_ALLOCATION_FAILED,
-} revlink_sync_status_t;
+    REVLINK_SYNC_MANIFEST_OK = 0,
+    REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT,
+    REVLINK_SYNC_MANIFEST_INVALID_FORMAT,
+    REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED,
+    REVLINK_SYNC_MANIFEST_BUFFER_TOO_SMALL,
+    REVLINK_SYNC_MANIFEST_ALLOCATION_FAILED,
+} revlink_sync_manifest_status_t;
 
 typedef struct {
     char path[REVLINK_SYNC_PATH_CAPACITY];
@@ -54,7 +54,7 @@ bool revlink_sync_manifest_metadata_matches(
     uint32_t size
 );
 
-revlink_sync_status_t revlink_sync_manifest_upsert(
+revlink_sync_manifest_status_t revlink_sync_manifest_upsert(
     revlink_sync_manifest_t *manifest,
     const uint8_t *path,
     size_t path_length,
@@ -68,7 +68,7 @@ revlink_sync_status_t revlink_sync_manifest_upsert(
  * initial_sync_utc is zero when no trusted wall clock exists. Existing
  * identical content keeps its original value, including an unknown zero.
  */
-revlink_sync_status_t revlink_sync_manifest_upsert_at(
+revlink_sync_manifest_status_t revlink_sync_manifest_upsert_at(
     revlink_sync_manifest_t *manifest,
     const uint8_t *path,
     size_t path_length,
@@ -79,14 +79,14 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
     const char *cache_name
 );
 
-revlink_sync_status_t revlink_sync_manifest_serialize(
+revlink_sync_manifest_status_t revlink_sync_manifest_serialize(
     const revlink_sync_manifest_t *manifest,
     char *output,
     size_t output_capacity,
     size_t *output_length
 );
 
-revlink_sync_status_t revlink_sync_manifest_parse(
+revlink_sync_manifest_status_t revlink_sync_manifest_parse(
     const char *input,
     size_t input_length,
     revlink_sync_manifest_t *manifest
@@ -127,7 +127,7 @@ size_t revlink_sync_manifest_digest_users(
     const uint8_t sha256[REVLINK_SYNC_SHA256_BYTES]
 );
 
-const char *revlink_sync_status_name(revlink_sync_status_t status);
+const char *revlink_sync_manifest_status_name(revlink_sync_manifest_status_t status);
 
 #ifdef __cplusplus
 }

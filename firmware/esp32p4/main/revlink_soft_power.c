@@ -84,9 +84,9 @@ static void perform_shutdown(void)
         TAG,
         "Soft shutdown requested; new syncs are now blocked"
     );
-    const revlink_sync_status_t prepare_status =
+    const revlink_sync_coordinator_status_t prepare_status =
         revlink_runtime_prepare_shutdown();
-    if (prepare_status != REVLINK_SYNC_OK) {
+    if (prepare_status != REVLINK_SYNC_COORDINATOR_OK) {
         ESP_LOGE(
             TAG,
             "Soft shutdown blocked while preparing runtime: status=%d",

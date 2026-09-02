@@ -41,7 +41,7 @@ const revlink_sync_history_entry_t *revlink_sync_history_find_version(
  * Record an immutable observed version. Re-observing the same path and digest
  * is idempotent. Reusing a path with different bytes appends a new sequence.
  */
-revlink_sync_status_t revlink_sync_history_record(
+revlink_sync_manifest_status_t revlink_sync_history_record(
     revlink_sync_history_t *history,
     const uint8_t *path,
     size_t path_length,
@@ -52,7 +52,7 @@ revlink_sync_status_t revlink_sync_history_record(
     uint32_t *sequence
 );
 
-revlink_sync_status_t revlink_sync_history_record_at(
+revlink_sync_manifest_status_t revlink_sync_history_record_at(
     revlink_sync_history_t *history,
     const uint8_t *path,
     size_t path_length,
@@ -64,14 +64,14 @@ revlink_sync_status_t revlink_sync_history_record_at(
     uint32_t *sequence
 );
 
-revlink_sync_status_t revlink_sync_history_serialize(
+revlink_sync_manifest_status_t revlink_sync_history_serialize(
     const revlink_sync_history_t *history,
     char *output,
     size_t output_capacity,
     size_t *output_length
 );
 
-revlink_sync_status_t revlink_sync_history_parse(
+revlink_sync_manifest_status_t revlink_sync_history_parse(
     const char *input,
     size_t input_length,
     revlink_sync_history_t *history

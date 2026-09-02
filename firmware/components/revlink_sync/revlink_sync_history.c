@@ -161,7 +161,7 @@ const revlink_sync_history_entry_t *revlink_sync_history_find_version(
     return NULL;
 }
 
-revlink_sync_status_t revlink_sync_history_record(
+revlink_sync_manifest_status_t revlink_sync_history_record(
     revlink_sync_history_t *history,
     const uint8_t *path,
     size_t path_length,
@@ -185,7 +185,7 @@ revlink_sync_status_t revlink_sync_history_record(
     );
 }
 
-revlink_sync_status_t revlink_sync_history_record_at(
+revlink_sync_manifest_status_t revlink_sync_history_record_at(
     revlink_sync_history_t *history,
     const uint8_t *path,
     size_t path_length,
@@ -201,7 +201,7 @@ revlink_sync_status_t revlink_sync_history_record_at(
         || !valid_path(path, path_length)
         || !valid_object_name(object_name)
         || history->next_sequence == 0U) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
     }
     const revlink_sync_history_entry_t *existing =
         revlink_sync_history_find_version(
@@ -212,11 +212,11 @@ revlink_sync_status_t revlink_sync_history_record_at(
         );
     if (existing != NULL) {
         *sequence = existing->sequence;
-        return REVLINK_SYNC_OK;
+        return REVLINK_SYNC_MANIFEST_OK;
     }
     if (history->count >= REVLINK_SYNC_HISTORY_CAPACITY
         || history->next_sequence == UINT32_MAX) {
-        return REVLINK_SYNC_CAPACITY_EXCEEDED;
+        return REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED;
     }
 
     revlink_sync_history_entry_t *entry = &history->entries[history->count++];
@@ -230,10 +230,10 @@ revlink_sync_status_t revlink_sync_history_record_at(
     memcpy(entry->sha256, sha256, REVLINK_SYNC_SHA256_BYTES);
     memcpy(entry->object_name, object_name, strlen(object_name) + 1U);
     *sequence = entry->sequence;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_MANIFEST_OK;
 }
 
-revlink_sync_status_t revlink_sync_history_serialize(
+revlink_sync_manifest_status_t revlink_sync_history_serialize(
     const revlink_sync_history_t *history,
     char *output,
     size_t output_capacity,
@@ -244,7 +244,7 @@ revlink_sync_status_t revlink_sync_history_serialize(
         || (output == NULL && output_capacity != 0U)
         || history->count > REVLINK_SYNC_HISTORY_CAPACITY
         || history->next_sequence == 0U) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
     }
     size_t used = 0U;
 #define APPEND(value, length) \
@@ -252,7 +252,7 @@ revlink_sync_status_t revlink_sync_history_serialize(
         const size_t append_length = (length); \
         if (append_length > output_capacity - used) { \
             *output_length = used + append_length; \
-            return REVLINK_SYNC_BUFFER_TOO_SMALL; \
+            return REVLINK_SYNC_MANIFEST_BUFFER_TOO_SMALL; \
         } \
         memcpy(output + used, (value), append_length); \
         used += append_length; \
@@ -267,7 +267,7 @@ revlink_sync_status_t revlink_sync_history_serialize(
         (unsigned int)history->next_sequence
     );
     if (header_length < 0 || (size_t)header_length >= sizeof(header)) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
     }
     APPEND(header, (size_t)header_length);
 
@@ -280,7 +280,7 @@ revlink_sync_status_t revlink_sync_history_serialize(
                 strlen(entry->path)
             )
             || !valid_object_name(entry->object_name)) {
-            return REVLINK_SYNC_INVALID_ARGUMENT;
+            return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
         }
         char prefix[REVLINK_SYNC_PATH_CAPACITY + 80U];
         const int prefix_length = snprintf(
@@ -294,7 +294,7 @@ revlink_sync_status_t revlink_sync_history_serialize(
             (unsigned long long)entry->initial_sync_utc
         );
         if (prefix_length < 0 || (size_t)prefix_length >= sizeof(prefix)) {
-            return REVLINK_SYNC_INVALID_ARGUMENT;
+            return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
         }
         APPEND(prefix, (size_t)prefix_length);
         char digest[REVLINK_SYNC_SHA256_BYTES * 2U];
@@ -309,17 +309,17 @@ revlink_sync_status_t revlink_sync_history_serialize(
     }
 #undef APPEND
     *output_length = used;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_MANIFEST_OK;
 }
 
-revlink_sync_status_t revlink_sync_history_parse(
+revlink_sync_manifest_status_t revlink_sync_history_parse(
     const char *input,
     size_t input_length,
     revlink_sync_history_t *history
 )
 {
     if (input == NULL || history == NULL) {
-        return REVLINK_SYNC_INVALID_FORMAT;
+        return REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
     }
     bool version_two = false;
     size_t header_prefix_length = 0U;
@@ -343,7 +343,7 @@ revlink_sync_status_t revlink_sync_history_parse(
     ) {
         header_prefix_length = HISTORY_HEADER_V1_PREFIX_LENGTH;
     } else {
-        return REVLINK_SYNC_INVALID_FORMAT;
+        return REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
     }
     const char *header_newline = memchr(input, '\n', input_length);
     uint32_t encoded_next = 0U;
@@ -355,22 +355,22 @@ revlink_sync_status_t revlink_sync_history_parse(
             &encoded_next
         )
         || encoded_next == 0U) {
-        return REVLINK_SYNC_INVALID_FORMAT;
+        return REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
     }
 
     revlink_sync_history_t *parsed = calloc(1U, sizeof(*parsed));
     if (parsed == NULL) {
-        return REVLINK_SYNC_ALLOCATION_FAILED;
+        return REVLINK_SYNC_MANIFEST_ALLOCATION_FAILED;
     }
     parsed->next_sequence = encoded_next;
-    revlink_sync_status_t status = REVLINK_SYNC_OK;
+    revlink_sync_manifest_status_t status = REVLINK_SYNC_MANIFEST_OK;
     size_t offset = (size_t)(header_newline - input) + 1U;
     uint32_t highest_sequence = 0U;
     while (offset < input_length) {
         const char *line = input + offset;
         const char *newline = memchr(line, '\n', input_length - offset);
         if (newline == NULL || newline == line) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         const size_t line_length = (size_t)(newline - line);
@@ -381,7 +381,7 @@ revlink_sync_status_t revlink_sync_history_parse(
         for (size_t index = 0U; index <= line_length; ++index) {
             if (index == line_length || line[index] == '\t') {
                 if (count >= 7U || index == start) {
-                    status = REVLINK_SYNC_INVALID_FORMAT;
+                    status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
                     goto done;
                 }
                 fields[count] = line + start;
@@ -413,7 +413,7 @@ revlink_sync_status_t revlink_sync_history_parse(
                 digest
             )
             || lengths[object_field] >= sizeof(object_name)) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         memcpy(
@@ -425,8 +425,8 @@ revlink_sync_status_t revlink_sync_history_parse(
         if (!valid_object_name(object_name)
             || parsed->count >= REVLINK_SYNC_HISTORY_CAPACITY) {
             status = parsed->count >= REVLINK_SYNC_HISTORY_CAPACITY
-                ? REVLINK_SYNC_CAPACITY_EXCEEDED
-                : REVLINK_SYNC_INVALID_FORMAT;
+                ? REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED
+                : REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         revlink_sync_history_entry_t *entry =
@@ -443,7 +443,7 @@ revlink_sync_status_t revlink_sync_history_parse(
         offset += line_length + 1U;
     }
     if (highest_sequence >= parsed->next_sequence) {
-        status = REVLINK_SYNC_INVALID_FORMAT;
+        status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
         goto done;
     }
     *history = *parsed;

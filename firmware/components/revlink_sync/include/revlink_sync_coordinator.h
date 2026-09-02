@@ -10,11 +10,11 @@ extern "C" {
 #endif
 
 typedef enum {
-    REVLINK_SYNC_OK = 0,
-    REVLINK_SYNC_INVALID_ARGUMENT,
-    REVLINK_SYNC_INVALID_STATE,
-    REVLINK_SYNC_TRANSPORT_ERROR,
-} revlink_sync_status_t;
+    REVLINK_SYNC_COORDINATOR_OK = 0,
+    REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT,
+    REVLINK_SYNC_COORDINATOR_INVALID_STATE,
+    REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR,
+} revlink_sync_coordinator_status_t;
 
 typedef enum {
     REVLINK_SYNC_IDLE = 0,
@@ -66,11 +66,11 @@ typedef struct {
     int last_platform_error;
 } revlink_sync_snapshot_t;
 
-typedef revlink_sync_status_t (*revlink_sync_transport_request_t)(
+typedef revlink_sync_coordinator_status_t (*revlink_sync_transport_request_t)(
     void *context
 );
 
-typedef revlink_sync_status_t (*revlink_sync_transport_cancel_t)(
+typedef revlink_sync_coordinator_status_t (*revlink_sync_transport_cancel_t)(
     void *context
 );
 
@@ -94,13 +94,13 @@ typedef struct {
     revlink_sync_coordinator_config_t config;
 } revlink_sync_coordinator_t;
 
-revlink_sync_status_t revlink_sync_coordinator_init(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_init(
     revlink_sync_coordinator_t *coordinator,
     const revlink_sync_coordinator_config_t *config,
     const revlink_sync_policy_t *policy
 );
 
-revlink_sync_status_t revlink_sync_coordinator_set_policy(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_set_policy(
     revlink_sync_coordinator_t *coordinator,
     const revlink_sync_policy_t *policy
 );
@@ -109,19 +109,19 @@ revlink_sync_policy_t revlink_sync_coordinator_policy(
     const revlink_sync_coordinator_t *coordinator
 );
 
-revlink_sync_status_t revlink_sync_coordinator_request(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_request(
     revlink_sync_coordinator_t *coordinator
 );
 
-revlink_sync_status_t revlink_sync_coordinator_recover_session(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_recover_session(
     revlink_sync_coordinator_t *coordinator
 );
 
-revlink_sync_status_t revlink_sync_coordinator_cancel(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_cancel(
     revlink_sync_coordinator_t *coordinator
 );
 
-revlink_sync_status_t revlink_sync_coordinator_handle_event(
+revlink_sync_coordinator_status_t revlink_sync_coordinator_handle_event(
     revlink_sync_coordinator_t *coordinator,
     const revlink_sync_event_t *event
 );

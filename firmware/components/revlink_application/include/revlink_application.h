@@ -60,7 +60,7 @@ revlink_core_status_t revlink_application_authorize(
     revlink_operation_t operation
 );
 
-revlink_sync_status_t revlink_application_set_sync_policy(
+revlink_sync_coordinator_status_t revlink_application_set_sync_policy(
     revlink_application_t *application,
     const revlink_sync_policy_t *policy
 );
@@ -69,7 +69,7 @@ revlink_sync_policy_t revlink_application_sync_policy(
     const revlink_application_t *application
 );
 
-revlink_sync_status_t revlink_application_request_sync(
+revlink_sync_coordinator_status_t revlink_application_request_sync(
     revlink_application_t *application
 );
 
@@ -78,7 +78,7 @@ revlink_sync_status_t revlink_application_request_sync(
  * owns the retry budget and revalidates device/coordinator state; the
  * platform owns the delay so this core remains scheduler independent.
  */
-revlink_sync_status_t revlink_application_retry_auto_sync(
+revlink_sync_coordinator_status_t revlink_application_retry_auto_sync(
     revlink_application_t *application
 );
 
@@ -86,11 +86,11 @@ bool revlink_application_auto_sync_retry_needed(
     const revlink_application_t *application
 );
 
-revlink_sync_status_t revlink_application_cancel_sync(
+revlink_sync_coordinator_status_t revlink_application_cancel_sync(
     revlink_application_t *application
 );
 
-revlink_sync_status_t revlink_application_handle_sync_event(
+revlink_sync_coordinator_status_t revlink_application_handle_sync_event(
     revlink_application_t *application,
     const revlink_sync_event_t *event
 );

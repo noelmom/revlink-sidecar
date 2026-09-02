@@ -271,17 +271,17 @@ static void network_time_synchronized(struct timeval *time_value)
 #endif
 
 static revlink_control_status_t map_sync_status(
-    revlink_sync_status_t status
+    revlink_sync_coordinator_status_t status
 )
 {
     switch (status) {
-    case REVLINK_SYNC_OK:
+    case REVLINK_SYNC_COORDINATOR_OK:
         return REVLINK_CONTROL_OK;
-    case REVLINK_SYNC_INVALID_ARGUMENT:
+    case REVLINK_SYNC_COORDINATOR_INVALID_ARGUMENT:
         return REVLINK_CONTROL_INVALID_ARGUMENT;
-    case REVLINK_SYNC_INVALID_STATE:
+    case REVLINK_SYNC_COORDINATOR_INVALID_STATE:
         return REVLINK_CONTROL_INVALID_STATE;
-    case REVLINK_SYNC_TRANSPORT_ERROR:
+    case REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR:
         return REVLINK_CONTROL_TRANSPORT_ERROR;
     default:
         return REVLINK_CONTROL_TRANSPORT_ERROR;
@@ -355,7 +355,7 @@ revlink_control_status_t revlink_runtime_control_execute(
     );
 }
 
-static revlink_sync_status_t request_usb_sync(void *context)
+static revlink_sync_coordinator_status_t request_usb_sync(void *context)
 {
     (void)context;
     if (
@@ -366,27 +366,27 @@ static revlink_sync_status_t request_usb_sync(void *context)
             TAG,
             "Sync rejected because local microSD storage is unavailable"
         );
-        return REVLINK_SYNC_INVALID_STATE;
+        return REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     }
     return revlink_accessport_usb_request_sync() == ESP_OK
-        ? REVLINK_SYNC_OK
-        : REVLINK_SYNC_TRANSPORT_ERROR;
+        ? REVLINK_SYNC_COORDINATOR_OK
+        : REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR;
 }
 
-static revlink_sync_status_t recover_usb_session(void *context)
+static revlink_sync_coordinator_status_t recover_usb_session(void *context)
 {
     (void)context;
     return revlink_accessport_usb_request_close_recovery() == ESP_OK
-        ? REVLINK_SYNC_OK
-        : REVLINK_SYNC_TRANSPORT_ERROR;
+        ? REVLINK_SYNC_COORDINATOR_OK
+        : REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR;
 }
 
-static revlink_sync_status_t cancel_usb_sync(void *context)
+static revlink_sync_coordinator_status_t cancel_usb_sync(void *context)
 {
     (void)context;
     return revlink_accessport_usb_cancel_sync() == ESP_OK
-        ? REVLINK_SYNC_OK
-        : REVLINK_SYNC_TRANSPORT_ERROR;
+        ? REVLINK_SYNC_COORDINATOR_OK
+        : REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR;
 }
 
 static void log_sync_state(
@@ -444,13 +444,13 @@ static void handle_sync_event(
 )
 {
     revlink_application_t *target = (revlink_application_t *)context;
-    const revlink_sync_status_t status =
+    const revlink_sync_coordinator_status_t status =
         revlink_application_handle_sync_event(target, event);
-    if (status != REVLINK_SYNC_OK) {
+    if (status != REVLINK_SYNC_COORDINATOR_OK) {
         ESP_LOGE(TAG, "sync event=%d rejected status=%d", event->kind, status);
     }
     const bool recovery_queued =
-        status == REVLINK_SYNC_OK
+        status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_FAILED
         && !event->close_recovery_attempt
         && event->data_phase_completed
@@ -464,14 +464,14 @@ static void handle_sync_event(
             "session-close recovery queued"
         );
     }
-    if (status == REVLINK_SYNC_OK
+    if (status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_FAILED
         && revlink_application_auto_sync_retry_needed(target)) {
         schedule_auto_sync_retry(target);
     }
 
     const bool continuation_needed =
-        status == REVLINK_SYNC_OK
+        status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_COMPLETED
         && !event->close_recovery_attempt
         && event->data_phase_completed
@@ -481,9 +481,9 @@ static void handle_sync_event(
         && event->downloaded > 0U
         && !atomic_load(&shutdown_requested);
     if (continuation_needed) {
-        const revlink_sync_status_t continuation_status =
+        const revlink_sync_coordinator_status_t continuation_status =
             revlink_application_request_sync(target);
-        if (continuation_status == REVLINK_SYNC_OK) {
+        if (continuation_status == REVLINK_SYNC_COORDINATOR_OK) {
             ESP_LOGI(
                 TAG,
                 "bounded sync batch completed with %u files pending; "
@@ -513,7 +513,7 @@ static void handle_sync_event(
      * refuses the write outright with ESP_ERR_INVALID_STATE. Record the
      * intent instead and let the device tell us when it is ready again.
      */
-    if (status == REVLINK_SYNC_OK
+    if (status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_COMPLETED
         && !continuation_needed
         && !atomic_load(&shutdown_requested)) {
@@ -522,7 +522,7 @@ static void handle_sync_event(
 #endif
 
     const bool unclean_terminal_close =
-        status == REVLINK_SYNC_OK
+        status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_FAILED
         && event->data_phase_completed
         && !event->session_close_acknowledged;
@@ -549,7 +549,7 @@ static void handle_sync_event(
 #if CONFIG_REVLINK_USB_CLOSE_RECOVERY_ACCEPTANCE
     if (recovery_queued) {
         atomic_store(&close_recovery_failure_seen, true);
-    } else if (status == REVLINK_SYNC_OK
+    } else if (status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_COMPLETED
         && event->close_recovery_attempt
         && atomic_load(&close_recovery_failure_seen)
@@ -564,7 +564,7 @@ static void handle_sync_event(
 #endif
 
 #if CONFIG_REVLINK_USB_SESSION_CYCLE_ACCEPTANCE
-    if (status == REVLINK_SYNC_OK
+    if (status == REVLINK_SYNC_COORDINATOR_OK
         && event->kind == REVLINK_SYNC_EVENT_COMPLETED) {
         const unsigned int completed =
             atomic_fetch_add(&session_cycles_completed, 1U) + 1U;
@@ -577,7 +577,7 @@ static void handle_sync_event(
             event->session_close_sent ? "yes" : "no",
             event->session_close_acknowledged ? "yes" : "no"
         );
-    } else if (status == REVLINK_SYNC_OK
+    } else if (status == REVLINK_SYNC_COORDINATOR_OK
         && (event->kind == REVLINK_SYNC_EVENT_FAILED
             || event->kind == REVLINK_SYNC_EVENT_CANCELLED)) {
         ESP_LOGE(
@@ -668,14 +668,14 @@ static void auto_sync_retry_task(void *context)
 
     const revlink_device_snapshot_t device =
         revlink_device_service_snapshot(&target->device_service);
-    revlink_sync_status_t status = REVLINK_SYNC_INVALID_STATE;
+    revlink_sync_coordinator_status_t status = REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     if (!atomic_load(&shutdown_requested)
         && device.identity.attachment_generation == expected_generation) {
         status = revlink_application_retry_auto_sync(target);
     }
     atomic_store(&auto_sync_retry_scheduled, false);
 
-    if (status == REVLINK_SYNC_OK) {
+    if (status == REVLINK_SYNC_COORDINATOR_OK) {
         ESP_LOGI(TAG, "bounded attach-time auto-sync retry queued");
     } else if (device.identity.attachment_generation == expected_generation) {
         ESP_LOGW(
@@ -754,9 +754,9 @@ static void session_cycle_acceptance_task(void *context)
 {
     (void)context;
     vTaskDelay(pdMS_TO_TICKS(300));
-    const revlink_sync_status_t status = revlink_runtime_request_sync();
+    const revlink_sync_coordinator_status_t status = revlink_runtime_request_sync();
     atomic_store(&session_cycle_repeat_scheduled, false);
-    if (status != REVLINK_SYNC_OK) {
+    if (status != REVLINK_SYNC_COORDINATOR_OK) {
         ESP_LOGE(
             TAG,
             "SESSION-CYCLE ACCEPTANCE FAILED: unable to queue next cycle "
@@ -917,11 +917,11 @@ static bool load_write_consent(void)
     return false;
 }
 
-revlink_sync_status_t revlink_runtime_set_auto_sync(bool enabled)
+revlink_sync_coordinator_status_t revlink_runtime_set_auto_sync(bool enabled)
 {
     if (!application_ready || !settings_ready
         || atomic_load(&shutdown_requested)) {
-        return REVLINK_SYNC_INVALID_STATE;
+        return REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     }
     const esp_err_t set_status = nvs_set_u8(
         settings_handle,
@@ -929,7 +929,7 @@ revlink_sync_status_t revlink_runtime_set_auto_sync(bool enabled)
         enabled ? 1U : 0U
     );
     if (set_status != ESP_OK || nvs_commit(settings_handle) != ESP_OK) {
-        return REVLINK_SYNC_TRANSPORT_ERROR;
+        return REVLINK_SYNC_COORDINATOR_TRANSPORT_ERROR;
     }
     const revlink_sync_policy_t policy = {
         .auto_sync_on_attach = enabled,
@@ -1039,26 +1039,26 @@ esp_err_t revlink_runtime_set_delete_consent(bool enabled)
 #endif
 }
 
-revlink_sync_status_t revlink_runtime_request_sync(void)
+revlink_sync_coordinator_status_t revlink_runtime_request_sync(void)
 {
     return application_ready && !atomic_load(&shutdown_requested)
         && revlink_sd_storage_status().state
             == REVLINK_SD_STORAGE_MOUNTED
         ? revlink_application_request_sync(&application)
-        : REVLINK_SYNC_INVALID_STATE;
+        : REVLINK_SYNC_COORDINATOR_INVALID_STATE;
 }
 
-revlink_sync_status_t revlink_runtime_cancel_sync(void)
+revlink_sync_coordinator_status_t revlink_runtime_cancel_sync(void)
 {
     return application_ready
         ? revlink_application_cancel_sync(&application)
-        : REVLINK_SYNC_INVALID_STATE;
+        : REVLINK_SYNC_COORDINATOR_INVALID_STATE;
 }
 
-revlink_sync_status_t revlink_runtime_prepare_shutdown(void)
+revlink_sync_coordinator_status_t revlink_runtime_prepare_shutdown(void)
 {
     if (!application_ready) {
-        return REVLINK_SYNC_INVALID_STATE;
+        return REVLINK_SYNC_COORDINATOR_INVALID_STATE;
     }
     const bool already_requested =
         atomic_exchange(&shutdown_requested, true);
@@ -1066,12 +1066,12 @@ revlink_sync_status_t revlink_runtime_prepare_shutdown(void)
         const revlink_sync_policy_t disabled_policy = {
             .auto_sync_on_attach = false,
         };
-        const revlink_sync_status_t policy_status =
+        const revlink_sync_coordinator_status_t policy_status =
             revlink_application_set_sync_policy(
                 &application,
                 &disabled_policy
             );
-        if (policy_status != REVLINK_SYNC_OK) {
+        if (policy_status != REVLINK_SYNC_COORDINATOR_OK) {
             atomic_store(&shutdown_requested, false);
             return policy_status;
         }
@@ -1082,7 +1082,7 @@ revlink_sync_status_t revlink_runtime_prepare_shutdown(void)
     if (state == REVLINK_SYNC_QUEUED || state == REVLINK_SYNC_RUNNING) {
         return revlink_application_cancel_sync(&application);
     }
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_COORDINATOR_OK;
 }
 
 revlink_sync_policy_t revlink_runtime_sync_policy(void)

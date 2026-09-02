@@ -171,7 +171,7 @@ bool revlink_sync_manifest_metadata_matches(
         && entry->device_time_raw == device_time_raw && entry->size == size;
 }
 
-revlink_sync_status_t revlink_sync_manifest_upsert(
+revlink_sync_manifest_status_t revlink_sync_manifest_upsert(
     revlink_sync_manifest_t *manifest,
     const uint8_t *path,
     size_t path_length,
@@ -193,7 +193,7 @@ revlink_sync_status_t revlink_sync_manifest_upsert(
     );
 }
 
-revlink_sync_status_t revlink_sync_manifest_upsert_at(
+revlink_sync_manifest_status_t revlink_sync_manifest_upsert_at(
     revlink_sync_manifest_t *manifest,
     const uint8_t *path,
     size_t path_length,
@@ -207,7 +207,7 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
     if (manifest == NULL || sha256 == NULL || size == 0U
         || !valid_path_bytes(path, path_length)
         || !valid_cache_name(cache_name)) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
     }
 
     size_t target = manifest->count;
@@ -221,7 +221,7 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
     const bool had_entry = target < manifest->count;
     if (target == manifest->count) {
         if (manifest->count >= REVLINK_SYNC_MANIFEST_CAPACITY) {
-            return REVLINK_SYNC_CAPACITY_EXCEEDED;
+            return REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED;
         }
         ++manifest->count;
     }
@@ -254,7 +254,7 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
     memcpy(entry->sha256, sha256, REVLINK_SYNC_SHA256_BYTES);
     memcpy(entry->cache_name, cache_name, strlen(cache_name) + 1U);
     entry->presence = preserved_presence;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_MANIFEST_OK;
 }
 
 bool revlink_sync_manifest_set_presence(
@@ -340,7 +340,7 @@ const char *revlink_sync_presence_name(revlink_sync_presence_t presence)
     }
 }
 
-revlink_sync_status_t revlink_sync_manifest_serialize(
+revlink_sync_manifest_status_t revlink_sync_manifest_serialize(
     const revlink_sync_manifest_t *manifest,
     char *output,
     size_t output_capacity,
@@ -350,7 +350,7 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
     if (manifest == NULL || output_length == NULL
         || (output == NULL && output_capacity != 0U)
         || manifest->count > REVLINK_SYNC_MANIFEST_CAPACITY) {
-        return REVLINK_SYNC_INVALID_ARGUMENT;
+        return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
     }
 
     size_t used = 0U;
@@ -359,7 +359,7 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
         const size_t append_length = (length); \
         if (append_length > output_capacity - used) { \
             *output_length = used + append_length; \
-            return REVLINK_SYNC_BUFFER_TOO_SMALL; \
+            return REVLINK_SYNC_MANIFEST_BUFFER_TOO_SMALL; \
         } \
         memcpy(output + used, (value), append_length); \
         used += append_length; \
@@ -375,7 +375,7 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
         const size_t path_length = strlen(entry->path);
         if (!valid_path_bytes((const uint8_t *)entry->path, path_length)
             || !valid_cache_name(entry->cache_name) || entry->size == 0U) {
-            return REVLINK_SYNC_INVALID_ARGUMENT;
+            return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
         }
 
         char prefix[REVLINK_SYNC_PATH_CAPACITY + 64U];
@@ -389,7 +389,7 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
             (unsigned long long)entry->initial_sync_utc
         );
         if (prefix_length < 0 || (size_t)prefix_length >= sizeof(prefix)) {
-            return REVLINK_SYNC_INVALID_ARGUMENT;
+            return REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT;
         }
         APPEND_BYTES(prefix, (size_t)prefix_length);
 
@@ -414,17 +414,17 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
 #undef APPEND_BYTES
 
     *output_length = used;
-    return REVLINK_SYNC_OK;
+    return REVLINK_SYNC_MANIFEST_OK;
 }
 
-revlink_sync_status_t revlink_sync_manifest_parse(
+revlink_sync_manifest_status_t revlink_sync_manifest_parse(
     const char *input,
     size_t input_length,
     revlink_sync_manifest_t *manifest
 )
 {
     if (input == NULL || manifest == NULL) {
-        return REVLINK_SYNC_INVALID_FORMAT;
+        return REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
     }
     /*
      * v3 adds a presence column. v1 and v2 still load, and their entries come
@@ -467,7 +467,7 @@ revlink_sync_status_t revlink_sync_manifest_parse(
         version = 1U;
         header_length = REVLINK_SYNC_MANIFEST_HEADER_V1_LENGTH;
     } else {
-        return REVLINK_SYNC_INVALID_FORMAT;
+        return REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
     }
 
     /*
@@ -477,21 +477,21 @@ revlink_sync_status_t revlink_sync_manifest_parse(
      */
     revlink_sync_manifest_t *parsed = calloc(1U, sizeof(*parsed));
     if (parsed == NULL) {
-        return REVLINK_SYNC_ALLOCATION_FAILED;
+        return REVLINK_SYNC_MANIFEST_ALLOCATION_FAILED;
     }
 
-    revlink_sync_status_t status = REVLINK_SYNC_OK;
+    revlink_sync_manifest_status_t status = REVLINK_SYNC_MANIFEST_OK;
     size_t offset = header_length;
     while (offset < input_length) {
         const char *line = input + offset;
         const char *newline = memchr(line, '\n', input_length - offset);
         if (newline == NULL) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         const size_t line_length = (size_t)(newline - line);
         if (line_length == 0U) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
 
@@ -502,7 +502,7 @@ revlink_sync_status_t revlink_sync_manifest_parse(
         for (size_t index = 0U; index <= line_length; ++index) {
             if (index == line_length || line[index] == '\t') {
                 if (field_count >= 7U || index == field_start) {
-                    status = REVLINK_SYNC_INVALID_FORMAT;
+                    status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
                     goto done;
                 }
                 fields[field_count] = line + field_start;
@@ -521,7 +521,7 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 lengths[0]
             )
             || lengths[cache_field] >= REVLINK_SYNC_CACHE_NAME_CAPACITY) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
 
@@ -543,13 +543,13 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 digest
             )
             || !valid_cache_name(cache_name)) {
-            status = REVLINK_SYNC_INVALID_FORMAT;
+            status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         revlink_sync_presence_t presence = REVLINK_SYNC_PRESENCE_UNKNOWN;
         if (version == 3U) {
             if (lengths[6] != 1U) {
-                status = REVLINK_SYNC_INVALID_FORMAT;
+                status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
                 goto done;
             }
             switch (fields[6][0]) {
@@ -563,11 +563,11 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 presence = REVLINK_SYNC_PRESENCE_ABSENT;
                 break;
             default:
-                status = REVLINK_SYNC_INVALID_FORMAT;
+                status = REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
                 goto done;
             }
         }
-        const revlink_sync_status_t upsert_status =
+        const revlink_sync_manifest_status_t upsert_status =
             revlink_sync_manifest_upsert_at(
                 parsed,
                 (const uint8_t *)fields[0],
@@ -578,10 +578,10 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 digest,
                 cache_name
             );
-        if (upsert_status != REVLINK_SYNC_OK) {
-            status = upsert_status == REVLINK_SYNC_CAPACITY_EXCEEDED
+        if (upsert_status != REVLINK_SYNC_MANIFEST_OK) {
+            status = upsert_status == REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED
                 ? upsert_status
-                : REVLINK_SYNC_INVALID_FORMAT;
+                : REVLINK_SYNC_MANIFEST_INVALID_FORMAT;
             goto done;
         }
         (void)revlink_sync_manifest_set_presence(
@@ -600,20 +600,20 @@ done:
     return status;
 }
 
-const char *revlink_sync_status_name(revlink_sync_status_t status)
+const char *revlink_sync_manifest_status_name(revlink_sync_manifest_status_t status)
 {
     switch (status) {
-    case REVLINK_SYNC_OK:
+    case REVLINK_SYNC_MANIFEST_OK:
         return "ok";
-    case REVLINK_SYNC_INVALID_ARGUMENT:
+    case REVLINK_SYNC_MANIFEST_INVALID_ARGUMENT:
         return "invalid argument";
-    case REVLINK_SYNC_INVALID_FORMAT:
+    case REVLINK_SYNC_MANIFEST_INVALID_FORMAT:
         return "invalid format";
-    case REVLINK_SYNC_CAPACITY_EXCEEDED:
+    case REVLINK_SYNC_MANIFEST_CAPACITY_EXCEEDED:
         return "capacity exceeded";
-    case REVLINK_SYNC_BUFFER_TOO_SMALL:
+    case REVLINK_SYNC_MANIFEST_BUFFER_TOO_SMALL:
         return "buffer too small";
-    case REVLINK_SYNC_ALLOCATION_FAILED:
+    case REVLINK_SYNC_MANIFEST_ALLOCATION_FAILED:
         return "allocation failed";
     default:
         return "unknown";
