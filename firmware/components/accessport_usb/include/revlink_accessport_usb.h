@@ -91,7 +91,10 @@ typedef struct {
     uint8_t source_sha256[REVLINK_ACCESSPORT_UPLOAD_SHA256_BYTES];
 } revlink_accessport_map_upload_request_t;
 
-#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+/*
+ * Declared unconditionally: a build without deletion still reports a delete
+ * state of IDLE, so status consumers do not change shape with the flag.
+ */
 typedef enum {
     REVLINK_ACCESSPORT_DELETE_IDLE = 0,
     REVLINK_ACCESSPORT_DELETE_RUNNING,
@@ -99,6 +102,7 @@ typedef enum {
     REVLINK_ACCESSPORT_DELETE_FAILED,
 } revlink_accessport_delete_state_t;
 
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
 typedef struct {
     char name[REVLINK_ACCESSPORT_UPLOAD_NAME_CAPACITY];
     char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY];

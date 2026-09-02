@@ -3,6 +3,7 @@ set(
     "revlink_main.c"
     "revlink_backup.c"
     "revlink_map_upload.c"
+    "revlink_file_delete.c"
     "revlink_dev_console.c"
     "revlink_network_runtime.c"
     "revlink_sidecar_identity.c"

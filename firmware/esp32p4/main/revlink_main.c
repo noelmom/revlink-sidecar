@@ -24,6 +24,7 @@
 #include "revlink_onboarding.h"
 #include "revlink_portal.h"
 #include "revlink_local_metadata.h"
+#include "revlink_file_delete.h"
 #include "revlink_map_upload.h"
 #include "revlink_runtime.h"
 #include "revlink_sd_storage.h"
@@ -78,6 +79,7 @@ static void schedule_auto_sync_retry(revlink_application_t *target);
 #define REVLINK_AUTO_SYNC_KEY "auto_sync"
 #define REVLINK_WRITE_CONSENT_KEY "write_ok"
 #define REVLINK_MAP_AUTO_APPLY_KEY "map_auto"
+#define REVLINK_DELETE_CONSENT_KEY "delete_ok"
 
 static uint64_t monotonic_ms(void *context)
 {
@@ -307,7 +309,11 @@ static revlink_control_status_t read_control_snapshot(
 #else
             false,
 #endif
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+        .deletes_compiled = true,
+#else
         .deletes_compiled = false,
+#endif
         .shutdown_requested = atomic_load(&shutdown_requested),
     };
     return REVLINK_CONTROL_OK;
@@ -860,6 +866,34 @@ static bool load_map_auto_apply(void)
 #endif
 }
 
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+static bool load_delete_consent(void)
+{
+    if (!settings_ready) return false;
+
+    uint8_t stored = 0U;
+    const esp_err_t read_status = nvs_get_u8(
+        settings_handle,
+        REVLINK_DELETE_CONSENT_KEY,
+        &stored
+    );
+    if (read_status == ESP_OK) return stored != 0U;
+    if (read_status != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(
+            TAG,
+            "delete-consent setting unreadable; deletion stays locked: %s",
+            esp_err_to_name(read_status)
+        );
+    }
+    /*
+     * Unset or unreadable means locked. There is deliberately no build default
+     * to fall back on, unlike auto-apply: deletion is never on unless somebody
+     * turned it on.
+     */
+    return false;
+}
+#endif
+
 static bool load_write_consent(void)
 {
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
@@ -966,6 +1000,38 @@ esp_err_t revlink_runtime_set_map_auto_apply(bool enabled)
     if (set_status == ESP_OK && commit_status == ESP_OK) return ESP_OK;
 
     (void)revlink_map_upload_set_auto_apply(previous.auto_apply_enabled);
+    return set_status != ESP_OK ? set_status : commit_status;
+#else
+    (void)enabled;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t revlink_runtime_set_delete_consent(bool enabled)
+{
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+    if (!settings_ready || atomic_load(&shutdown_requested)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    revlink_file_delete_snapshot_t previous = {0};
+    const esp_err_t snapshot_status =
+        revlink_file_delete_snapshot(&previous);
+    if (snapshot_status != ESP_OK) return snapshot_status;
+    const esp_err_t consent_status =
+        revlink_file_delete_set_consent(enabled);
+    if (consent_status != ESP_OK) return consent_status;
+
+    const esp_err_t set_status = nvs_set_u8(
+        settings_handle,
+        REVLINK_DELETE_CONSENT_KEY,
+        enabled ? 1U : 0U
+    );
+    const esp_err_t commit_status =
+        set_status == ESP_OK ? nvs_commit(settings_handle) : set_status;
+    if (set_status == ESP_OK && commit_status == ESP_OK) return ESP_OK;
+
+    (void)revlink_file_delete_set_consent(previous.consent_enabled);
     return set_status != ESP_OK ? set_status : commit_status;
 #else
     (void)enabled;
@@ -1565,6 +1631,27 @@ void app_main(void)
             );
             return;
         }
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+        const esp_err_t delete_status = revlink_file_delete_start();
+        if (delete_status != ESP_OK) {
+            ESP_LOGE(
+                TAG,
+                "Guarded delete service failed to start: %s",
+                esp_err_to_name(delete_status)
+            );
+            return;
+        }
+        const esp_err_t delete_consent_status =
+            revlink_file_delete_set_consent(load_delete_consent());
+        if (delete_consent_status != ESP_OK) {
+            ESP_LOGE(
+                TAG,
+                "Unable to restore delete-consent setting: %s",
+                esp_err_to_name(delete_consent_status)
+            );
+            return;
+        }
+#endif
     } else {
         ESP_LOGW(
             TAG,
