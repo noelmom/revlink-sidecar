@@ -1,6 +1,13 @@
 {
-  "current": "v0.2.5-nano",
+  "current": "v0.2.6-nano",
   "releases": [
+    {
+      "id": "v0.2.6-nano",
+      "version": "0.2.6",
+      "profile": "nano",
+      "notes": "Documentation release. Identical firmware behaviour to 0.2.5; no reason to reflash.",
+      "commit": "bb5a0629"
+    },
     {
       "id": "v0.2.5-nano",
       "version": "0.2.5",
