@@ -42,15 +42,75 @@ link (`14`–`19`), audio signals (`9`–`13`), ESP32-P4 strapping pins
 
 ## Expected first boot
 
-1. The portal-style RevLink mark animates in.
-2. `REVLINK / SYSTEM ONLINE` completes its progress bar.
-3. The screen settles on `READY / CONNECT ACCESSPORT`.
-4. Attaching an AccessPort changes the display to inspection or ready state.
-5. A manual or automatic sync displays deterministic progress.
-6. A successful backup ends on `DRIVE READY / BACKUP COMPLETE`.
+1. The portal-style RevLink mark animates in beside the `REVLINK` wordmark,
+   with the running firmware version below it as `V0.2.5` and a progress bar
+   filling underneath. It holds for 1.5 s.
+2. With no AccessPort attached the screen settles on
+   `NO DEVICE / ACCESSPORT OFFLINE / CONNECT TO SYNC`.
+3. Attaching one moves it to `CHECKING / ACCESSPORT / USB HIGH SPEED`, then to
+   the ready screen, which shows the vehicle and part number rather than fixed
+   text.
+4. A sync shows `SYNCING / BACKING UP LOGS / KEEP CONNECTED` with progress.
+5. A finished sync ends on `BACKUP COMPLETE / SAFE TO DISCONNECT`.
 
 The display is output-only. It cannot authorize a write, initiate a sync, or
 bypass any safety gate.
+
+## Every screen
+
+The status screens share a layout: a header that alternates between `REVLINK`
+and `SIDECAR`, a Wi-Fi icon and network badge top-right when a network is up,
+then a headline, a detail line and a footer. The headline drops from the large
+font to the small one automatically if it is too wide.
+
+The badge says where the portal is: `LOCAL` while the Sidecar is running its
+own hotspot, the network's SSID once it has joined one, or `WIFI` if the SSID
+is unavailable. A long SSID is truncated to fit.
+
+| State | Headline | Detail | Footer |
+| --- | --- | --- | --- |
+| Booting | `STARTING` | `SYSTEM CHECK` | `REVLINK` |
+| No device | `NO DEVICE` | `ACCESSPORT OFFLINE` | `CONNECT TO SYNC` |
+| Inspecting | `CHECKING` | `ACCESSPORT` | `USB HIGH SPEED` |
+| Ready | vehicle, or `DEVICE CONNECTED` | part number | `READY TO SYNC` |
+| Sync queued | `SYNC QUEUED` | `PREPARING BACKUP` | `PLEASE WAIT` |
+| Syncing | `SYNCING` | `BACKING UP LOGS` | `KEEP CONNECTED` |
+| Session open | `CONNECTED` | `SESSION ACTIVE` | `KEEP CONNECTED` |
+| Cancelling | `FINISHING` | `CLOSING SAFELY` | `KEEP CONNECTED` |
+| Recovering | `RECOVERING` | `SAFE USB CLOSE` | `KEEP CONNECTED` |
+| Complete | vehicle, or `SYNC COMPLETE` | `BACKUP COMPLETE` | `SAFE TO DISCONNECT` |
+| Wi-Fi dropped | `WIFI LOST` | `RETRY <n> SEC`, or `RETRYING` with no countdown | `HOTSPOT NEXT` |
+| USB fault | `ATTENTION` | `USB NEEDS CHECK` | `OPEN REVLINK` |
+| Sync fault | `ATTENTION` | `SYNC NEEDS CHECK` | `OPEN REVLINK` |
+| Two AccessPorts | `MULTIPLE DEVICES` | `UNPLUG ALL DEVICES` | `THEN RECONNECT ONE` |
+| Unknown | `ATTENTION` | `STATUS UNKNOWN` | `OPEN REVLINK` |
+
+Four screens replace that layout entirely rather than sitting inside it:
+
+| Screen | Shown when | Contents |
+| --- | --- | --- |
+| Hotspot details | The fallback hotspot comes up | `REVLINK SETUP`, the SSID, `PASSWORD`, the password |
+| Wi-Fi QR | BOOT double-press while the hotspot is up | A scannable `WIFI:T:WPA;…` join code |
+| Local address | BOOT double-press while joined to a network | `OPEN IN BROWSER`, the hostname, `.local`, `PRESS TO CLOSE` |
+| Storage recovery | The card is missing or will not mount | See below |
+
+## Storage recovery screens
+
+These are the only screens that ask for input, and they are deliberately
+awkward because the outcome is destructive.
+
+| Step | Screen |
+| --- | --- |
+| No card | `SD CARD MISSING` / `INSERT A CARD` / `THEN RESTART` |
+| Card unreadable | `SD UNREADABLE` / `DOUBLE-PRESS BOOT` / `TO FORMAT` |
+| Awaiting confirmation | `ERASE SD CARD?` / `ALL DATA WILL BE LOST` / `DOUBLE-PRESS BOOT` / `CONFIRM IN <n> SEC` |
+| Formatting | `FORMATTING SD` / `DO NOT POWER OFF` |
+| Done | `FORMAT COMPLETE` / `STORAGE READY` / `RESTARTING` |
+| Failed | `FORMAT FAILED` / `CHECK SD CARD` / `THEN TRY AGAIN` |
+| Other error | `STORAGE ERROR` / `CHECK SD CARD` / `THEN RESTART` |
+
+Formatting requires two separate double-presses, the second within the
+countdown. One accidental double-press cannot erase a card.
 
 ## Bench build
 
@@ -81,7 +141,7 @@ The complete display path passed on the physical prototype on 2026-07-27:
 - device writes, automatic sync, destructive acceptance tests, and SD
   formatting remained disabled.
 
-The application image occupied about half of the 1 MiB app partition.
+The application image was about 1.34 MB in a 4 MiB app slot.
 
 ## One-run sync demonstration
 
