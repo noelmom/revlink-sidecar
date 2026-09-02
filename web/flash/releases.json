@@ -1,6 +1,13 @@
 {
-  "current": "v0.2.3-nano",
+  "current": "v0.2.4-nano",
   "releases": [
+    {
+      "id": "v0.2.4-nano",
+      "version": "0.2.4",
+      "profile": "nano",
+      "notes": "Fixes rows that offered no Delete button, and replaces the two delete buttons with one dialog.",
+      "commit": "e08f21a0"
+    },
     {
       "id": "v0.2.3-nano",
       "version": "0.2.3",
