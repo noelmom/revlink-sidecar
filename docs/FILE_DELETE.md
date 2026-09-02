@@ -4,9 +4,10 @@ RevLink can remove a file from the AccessPort's own storage. Only files
 directly inside `maps/` and `datalog/`, and only when two separate gates are
 both open.
 
-**Published images do not contain this.** `CONFIG_REVLINK_ALLOW_DEVICE_DELETES`
-defaults to `n`, and the flasher on this project's site serves a build without
-it.
+**From 0.2.2 the published image contains this.**
+`CONFIG_REVLINK_ALLOW_DEVICE_DELETES` still defaults to `n` for anyone building
+their own, and the Nano product profile turns it on. Compiling it in is not
+enabling it: consent is a runtime switch that starts locked on every boot.
 
 ## Why it is gated apart from writes
 
@@ -64,6 +65,13 @@ the portal, because the Sidecar still has it. That is deliberate — local
 copies surviving the device is the point of the product — but it means a row
 can outlive the file it came from, and a second delete of the same path is
 refused without transmitting anything.
+
+Since 0.2.2 the row says so. Each cached file records whether the last
+completed listing found it on the device, and one that is gone is badged
+**Sidecar only** and stops offering a Delete button. The flag is three-valued:
+a sync that was cancelled or cut short, and a cache written by an earlier
+build, both read as *unknown* rather than as absence — the portal will not
+claim a file has been removed on the strength of a listing it never finished.
 
 ## Accepted on hardware
 

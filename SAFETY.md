@@ -21,7 +21,7 @@ without being asked; see automatic application below.
 | Upload a map file | **Gated** | Compile flag + persistent owner consent. Copies a `.ptm` onto the AccessPort's storage; it does not install anything onto an ECU |
 | Auto-apply a staged map | **Gated** | The above, plus a separate preference and a matching pinned device — see [STAGED_MAPS.md](docs/STAGED_MAPS.md) |
 | Replace the startup screen | **Gated** | Fixed destination only |
-| Delete a file | **Gated, and compiled out of published images** | `maps/` and `datalog/` only, one level deep. Its own compile flag and its own consent, neither implied by the write gates |
+| Delete a file | **Gated** | `maps/` and `datalog/` only, one level deep. Its own compile flag and its own consent, neither implied by the write gates |
 | ECU flashing / live tuning | **Out of scope permanently** | Not a goal of this project |
 
 ## What a "write" is here
@@ -52,9 +52,16 @@ Only a file directly inside `maps/` or `datalog/` can be removed — not
 `images/`, not the directories themselves, nothing nested, no traversal. Every
 delete pins the device by part number and serial, requires the file to be
 present first, and re-lists the directory afterwards to confirm it is gone. A
-delete is never transmitted for a file the device does not list.
+delete is never transmitted for a file the device does not list. Each one is
+appended to an audit log on the card.
 
-Published images do not contain any of it.
+From 0.2.2 the published image contains it. Compiling it in is not enabling
+it: delete consent is a separate runtime switch that starts locked on every
+boot until the owner sets it, and is never implied by agreeing to map
+transfers. The reason to ship it is the same reason writes ship — without a
+computer, a full AccessPort cannot be cleared, and that is one of the two
+problems this project exists to solve. What deletion can cost you is a file
+you meant to keep; the Sidecar's own synced copy of it is kept either way.
 
 ## The two write gates
 
@@ -168,15 +175,36 @@ Verified on hardware: a complete export downloads successfully, and the
 device stays up through it. Heap holds flat at 33 MiB and the HTTP task keeps
 about 6 KiB of stack spare for the whole run.
 
-## Latent: restore path still keeps 4 KiB buffers on the stack
+## Fixed in 0.2.2: restore path's 4 KiB stack buffers
 
 `validate_pending()`, `skip_bytes()` and `revlink_backup_restore_merge()` each
-hold a `BACKUP_BUFFER_BYTES` array on the stack, on the same HTTP server task
-whose export equivalents had to be moved to the heap. Restore has not been
-exercised on hardware, so this has not been seen to fail — but the arithmetic
-is the same one that overflowed the export path.
+held a `BACKUP_BUFFER_BYTES` array on the stack, on the same HTTP server task
+whose export equivalents had to be moved to the heap. The worst case was
+8 KiB, not 4: `restore_merge()` calls `skip_bytes()` from inside its loop with
+its own buffer still live, against a 12 KiB stack that had itself been raised
+from 6 KiB after a measured 6116-byte peak overflowed it.
 
-Fixing it is not a search-and-replace: those loops size their reads with
-`sizeof(buffer)`, which silently becomes the size of a pointer if the array
-is swapped for a `malloc`. Each function needs its read sizing and its free
-paths handled deliberately.
+Restore still has not been exercised on hardware, so this was never observed
+to fail — it was the same arithmetic that had already overflowed once
+elsewhere. The buffers are now on the heap, and `skip_bytes()` borrows its
+caller's rather than allocating a second one.
+
+The trap, recorded because it is easy to walk into again: those loops sized
+their reads with `sizeof(buffer)`, which silently becomes the size of a
+pointer the moment the array becomes a `malloc` — a four-byte read loop that
+passes every test. They name the constant now, and the file has no
+`sizeof(buffer)` left in it.
+
+## Presence is three-valued, and absence needs evidence
+
+The Sidecar keeps its own copy of everything it syncs, so a file can exist
+here and not on the AccessPort. Since 0.2.2 each cached file records whether
+the last *completed* listing found it on the device, and the portal says
+"Sidecar only" for one that is gone.
+
+The state is deliberately three-valued. A sync that was cancelled, failed, or
+was cut short proves nothing about what is on the device, and a manifest
+written by an earlier build carries no evidence at all; both read as unknown
+rather than as absence. The API reports `null` for that case, and `null` is
+not `false`. Telling an owner their files had been removed because a sync was
+interrupted would be a worse failure than saying nothing.

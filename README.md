@@ -55,8 +55,10 @@ This project reads and writes *files*. It is not a tuning tool.
 - **Map writes arrive locked** and stay off until you enable them. Copying a
   `.ptm` onto the AccessPort's storage is not the same as installing it — that
   remains a deliberate action on the AccessPort itself.
-- **File deletion is compiled out** of published images, behind its own flag
-  and its own consent. See [SAFETY.md](SAFETY.md).
+- **File deletion arrives locked too**, behind a *separate* switch from map
+  writes — agreeing to one is never agreeing to the other. Only files directly
+  inside `maps/` and `datalog/`, and there is no undo. See
+  [SAFETY.md](SAFETY.md).
 - **No public internet exposure.** The portal has no transport encryption and
   is meant for a trusted local network.
 
@@ -101,8 +103,11 @@ image built for the other P4 variant.
 The published image can read your AccessPort and, once you turn it on, copy a
 `.ptm` map file back onto it. Writing arrives **locked**: you enable it in
 Settings, only `maps/*.ptm` is accepted, and every write is read back and
-checked against its SHA-256. Deleting files is compiled out of published
-images entirely.
+checked against its SHA-256.
+
+It can also delete files from `maps/` and `datalog/`, so a full AccessPort can
+be cleared without a computer. That is a second switch, locked by default and
+separate from writes, with no undo.
 
 See [`web/flash/`](web/flash/) to host the page yourself.
 

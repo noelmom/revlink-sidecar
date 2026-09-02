@@ -177,6 +177,45 @@ test("the published image matches what the manifest claims about writes", () => 
   }
 });
 
+test("the published image matches what the manifest claims about deletes", () => {
+  const app = readFileSync(join(RELEASE, "revlink-sidecar.bin"));
+  // The consent key and the locked-on-boot warning are only compiled when the
+  // capability is. Look for them rather than trusting the manifest's own flag,
+  // in either direction — a manifest that under-claims is as wrong as one that
+  // over-claims, because people decide what to install from it.
+  const present = app.includes(
+    Buffer.from("deletion stays locked", "latin1")
+  );
+  assert.equal(
+    present,
+    Boolean(manifest.deviceDeletes),
+    manifest.deviceDeletes
+      ? "manifest says deletion is compiled in, but the delete paths are absent"
+      : "manifest says deletion is compiled out, but the image contains it"
+  );
+});
+
+test("a delete-capable image ships with deletion locked and separately gated", () => {
+  if (!manifest.deviceDeletes) return;
+  const app = readFileSync(join(RELEASE, "revlink-sidecar.bin"));
+  // Deletion must not ride on the write consent flag. Its own NVS key is the
+  // evidence that it is a separate decision the owner has to make.
+  assert.ok(
+    app.includes(Buffer.from("delete_ok", "latin1")),
+    "delete-capable image has no separate delete-consent setting"
+  );
+  assert.ok(
+    app.includes(Buffer.from("deletion stays locked", "latin1")),
+    "delete-capable image does not declare deletion locked at startup"
+  );
+  // Deletion without writes is not a configuration this project ships.
+  assert.equal(
+    manifest.deviceWrites,
+    true,
+    "deletion is compiled in without writes"
+  );
+});
+
 test("a write-capable image still ships with owner consent locked", () => {
   if (!manifest.deviceWrites) return;
   const app = readFileSync(join(RELEASE, "revlink-sidecar.bin"));

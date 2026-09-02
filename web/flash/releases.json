@@ -1,6 +1,13 @@
 {
-  "current": "v0.2.1-nano",
+  "current": "v0.2.2-nano",
   "releases": [
+    {
+      "id": "v0.2.2-nano",
+      "version": "0.2.2",
+      "profile": "nano",
+      "notes": "Device presence tracking, guarded deletion compiled in, larger version on the boot splash.",
+      "commit": "119660ff"
+    },
     {
       "id": "v0.2.1-nano",
       "version": "0.2.1",

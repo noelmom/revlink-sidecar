@@ -58,16 +58,21 @@ tampered mirror fails before flashing, not halfway through it.
 
 `gate.test.mjs` additionally verifies that the published binaries match their
 recorded digests, that flash regions do not overlap, and that the image agrees
-with what the manifest claims about device writes — by looking for the
-write-path log strings in the binary rather than trusting the manifest's own
-flag, in either direction.
+with what the manifest claims about device writes and deletes — by looking for
+the corresponding log strings and NVS keys in the binary rather than trusting
+the manifest's own flags, in either direction. A manifest that *under*-claims
+fails too: people decide what to install from it.
+
+It also asserts the shipping posture those flags imply — that a write-capable
+image still declares consent locked at startup, and that a delete-capable one
+carries its own separate consent key rather than riding on the write flag.
 
 ## Releases are immutable
 
 ```
-releases.json                    {"current": "v0.2.1-nano"}
-firmware/v0.2.1-nano/            binaries + manifest.json + SHA256SUMS
-firmware/v0.2.2-nano/            the next one, alongside it
+releases.json                    {"current": "v0.2.2-nano"}
+firmware/v0.2.2-nano/            binaries + manifest.json + SHA256SUMS
+firmware/v0.2.1-nano/            the previous one, still reachable
 ```
 
 A published release directory is never rewritten. A version string has to name
