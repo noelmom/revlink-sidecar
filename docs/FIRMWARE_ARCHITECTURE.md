@@ -40,6 +40,9 @@ implementations, supplies configuration, and connects event callbacks.
 | `revlink_network` | Client-first/fallback-hotspot policy, sticky reconnect, time budgets, and transfer lock | None |
 | `revlink_credentials` | Bounded Wi-Fi identity/password validation and explicit zeroization | None |
 | `revlink_identity` | Persistent random Sidecar ID, MAC-derived local naming, and bounded collision suffixes | None |
+| `revlink_staged_map` | Staged-map record codec and the pure decision function for applying one after a sync | None |
+| `revlink_storage_recovery` | Guarded recovery state machine for a card that responds but does not mount | None |
+| `revlink_oled_render` | 5x7 font, framebuffer primitives, and the boot splash layout, renderable on a host | None |
 | `revlink_captive_dns` | Bounded DNS question parser and local IPv4 response encoder | None |
 | `revlink_time` | Trusted/untrusted wall-clock classification and portable timestamp conversion | None |
 | `revlink_update` | Bounded post-boot health decision, blocker reporting, and terminal ready/timeout/safety rejection | None |
@@ -82,15 +85,23 @@ GET  /api/portal/status
 GET  /api/portal/devices
 GET  /api/portal/files
 GET  /api/portal/file?digest=<64-hex-sha256>
+GET  /api/portal/backup
+POST /api/portal/backup/preview
+POST /api/portal/backup/restore
 POST /api/portal/device/select
 POST /api/portal/notes
 POST /api/portal/log-map
 POST /api/portal/sync
 POST /api/portal/sync/cancel
 POST /api/portal/auto-sync
+POST /api/portal/time
 POST /api/portal/writes
+POST /api/portal/deletes
+POST /api/portal/file/delete
 POST /api/portal/maps/stage
 POST /api/portal/maps/apply
+POST /api/portal/maps/auto-apply
+POST /api/portal/maps/discard
 GET/POST /api/portal/startup/profiles
 GET  /api/portal/startup/profile?id=<bounded-profile-id>
 POST /api/portal/startup/apply
@@ -329,8 +340,8 @@ The accepted commands are status, saved auto-sync policy, manual sync, and
 cooperative cancellation. Unknown commands fail closed. Mutating commands
 also return the resulting snapshot so a UI does not need to guess whether its
 request took effect. The ESP32-P4 composition root maps these commands onto
-the runtime application; a future HTTP/JSON adapter owns authentication,
-serialization, request-size limits, and task serialization.
+the runtime application. The portal's HTTP/JSON adapter, which ships, owns
+serialization, request-size limits, and task serialization on top of it.
 
 The optional development UART is the first concrete input adapter for this
 boundary. `revlink_cli` accepts only `status`, `sync`, `cancel`, `auto on`,
@@ -815,19 +826,26 @@ cmake --build firmware/test/build --parallel
 ctest --test-dir firmware/test/build --output-on-failure
 ```
 
-These cover protocol vectors, all 97 captured request parity checks, lifecycle
-transitions, strict root-list response parsing, incremental fragmented
-download decoding, both capture-valid JAMCRC and device-observed zero
-trailers, corrupt-trailer rejection, sink-failure propagation, and
-default-deny write/delete policy. Then build the active full-product P4
-profile:
+These cover protocol vectors, lifecycle transitions, strict root-list response
+parsing, incremental fragmented download decoding, both capture-valid JAMCRC
+and device-observed zero trailers, corrupt-trailer rejection, sink-failure
+propagation, and default-deny write/delete policy. The captured-request parity
+suite is not part of this repository — it replays a corpus of USB captures that
+is not published here — so `protocol_unit` covers the builders and parsers
+against self-contained vectors instead.
+
+Then build the shipped Nano profile. Fragment order matters: the list must end
+with `sdkconfig.nano.defaults`, because `sdkconfig.oled.defaults` carries
+`# CONFIG_REVLINK_ALLOW_DEVICE_WRITES is not set` and would otherwise be the
+last word on it, producing a writes-off image.
 
 ```sh
+NANO_BUILD="$PWD/firmware/esp32p4/build-nano"
 idf.py -C firmware/esp32p4 \
-  -B firmware/esp32p4/build-onboarding \
-  -D "SDKCONFIG=$PWD/firmware/esp32p4/build-onboarding/sdkconfig" \
-  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.oled.defaults;sdkconfig.wifi-scan.defaults;sdkconfig.wifi-join.defaults;sdkconfig.network-runtime.defaults;sdkconfig.onboarding.defaults' \
-  build
+  -B "$NANO_BUILD" \
+  -D "SDKCONFIG=$NANO_BUILD/sdkconfig" \
+  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.oled.defaults;sdkconfig.wifi-scan.defaults;sdkconfig.wifi-join.defaults;sdkconfig.network-runtime.defaults;sdkconfig.onboarding.defaults;sdkconfig.nano.defaults' \
+  set-target esp32p4 build
 ```
 
 Hardware acceptance remains staged. Enabling an interface, read, write,

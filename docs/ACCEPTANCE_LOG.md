@@ -88,7 +88,7 @@ acceptance must use a dedicated disposable card rather than a customer's
 existing cache.
 
 Full-card development backup and restore policy is documented in
-[`../../docs/SIDECAR_SD_BACKUP.md`](../../docs/SIDECAR_SD_BACKUP.md). A
+[`../../docs/SIDECAR_SD_BACKUP.md`](SIDECAR_SD_BACKUP.md). A
 verified backup is required before storage-schema changes, destructive
 storage acceptance, and live unreadable-card format testing.
 
@@ -170,7 +170,7 @@ cycle:
 A card already initialized in native SD mode may require a true board power
 cycle before the SPI profile can select SPI mode. A CPU-only reset did not
 reliably reset the powered removable card. See
-[`WIFI_BRINGUP.md`](../../docs/WIFI_BRINGUP.md)
+[`WIFI_BRINGUP.md`](WIFI_BRINGUP.md)
 for the accepted resource map and repeatable checks.
 
 The RAM-only station-join acceptance also passed on 2026-07-27. The onboard
@@ -217,7 +217,7 @@ two 4 MiB OTA release slots, redundant OTA selection data, and a bounded crash
 partition. Updated images boot pending verification and roll back if they
 restart before an explicit application health confirmation. The update
 transport and health-confirmation service remain deliberately unimplemented;
-see [`../../docs/FIRMWARE_UPDATE.md`](../../docs/FIRMWARE_UPDATE.md).
+see [`../../docs/FIRMWARE_UPDATE.md`](FIRMWARE_UPDATE.md).
 
 The onboarding image passed live hardware acceptance on 2026-07-27:
 
@@ -263,7 +263,7 @@ passed live on 2026-07-29: the second unit latched the conflict without
 starting a sync, removal of only one unit stayed fail-closed, full detach
 cleared the latch, and a single reattach recovered without rebooting. The
 remaining hardware matrix in
-[`../../docs/SINGLE_ACCESSPORT_SAFETY.md`](../../docs/SINGLE_ACCESSPORT_SAFETY.md)
+[`../../docs/SINGLE_ACCESSPORT_SAFETY.md`](SINGLE_ACCESSPORT_SAFETY.md)
 is still required before beta. Guarded writes are compiled into the normal
 image, remain owner-disabled on a new or factory-reset Sidecar, and retain
 separate target-pinning and abort acceptance gates.
@@ -368,7 +368,7 @@ Catalog membership grants only the reviewed read-only file path; it does not
 enable live telemetry, map decoding, upload, deletion, or firmware operations.
 The API exposes catalog revision, family, and compatibility fields for both
 the attached device and selected cached dataset. See
-[`docs/SUPPORTED_ACCESSPORTS.md`](../../docs/SUPPORTED_ACCESSPORTS.md).
+[`docs/SUPPORTED_ACCESSPORTS.md`](SUPPORTED_ACCESSPORTS.md).
 Full local CI passed with 14/14 host suites, and the production image then
 identified the attached donor as exact part `AP3-VLK-002`, family
 `Volkswagen / Audi`, before completing the normal acknowledged close.

@@ -72,12 +72,19 @@ For a read-only sync, detecting a second AccessPort requests cooperative
 cancellation at the next safe boundary, performs the accepted close sequence
 against only the pinned device when possible, and then enters `conflict`.
 
-Future writes require an operation-specific abort policy. Detection of a
-second AccessPort must never retarget or automatically retry a write. The
-write implementation may finish only the already-defined non-interruptible
-protocol step needed to leave the original target in a known state, then must
-close or fault and enter `conflict`. Map/startup-image writes cannot be enabled
-for beta until this behavior is tested.
+Writes and deletes ship as of 0.2.2, and what protects them today is the
+transport, not the absence of the feature. Every USB transaction — read, write
+or delete — is refused unless exactly one eligible AccessPort is enumerated and
+no conflict is latched (`revlink_accessport_usb.c`, the
+`conflict_latched || eligible_accessport_count(state) != 1U` guards). A second
+device arriving therefore stops the next transaction rather than retargeting
+it, and detection never retries or redirects a write.
+
+What is **not** yet proven is the harder case: a second AccessPort arriving
+*during* a write, rather than between transactions. The intended policy is that
+the write may finish only the already-defined non-interruptible protocol step
+needed to leave the original target in a known state, then close or fault and
+enter `conflict`. That path has not been exercised on hardware.
 
 ## Recovery after the customer unplugs one
 
@@ -134,10 +141,12 @@ The reversed address/enumeration-order and stale topology revision cases pass
 in the platform-neutral host suite. The remaining unchecked host-matrix cases
 and the physical powered-hub matrix remain part of the beta gate.
 
-Write-specific host tests must be added before write capability is compiled
-in: map upload, startup-screen apply, overwrite, delete, cancellation, and
-transport failure must all prove that a second device cannot change the pinned
-target.
+Write-specific host tests remain outstanding: map upload, startup-screen
+apply, overwrite, delete, cancellation, and transport failure should each
+prove that a second device cannot change the pinned target. The capability
+shipped before these were written, on the strength of the transport-level
+guard above; they are still worth having, because that guard is one condition
+in two places rather than a tested invariant.
 
 ## Required hardware acceptance
 
@@ -159,8 +168,9 @@ Record both true AccessPort identities, USB topology, portal/OLED state,
 transaction logs, cancellation/close result, and proof that no request was
 sent to the second unit.
 
-The gate passes only when all host tests and the read-only hardware matrix
-pass. Write acceptance remains a later, separately authorized gate.
+The read-only matrix and the host suite are what this gate was written
+against. Write acceptance under conflict — a second device arriving mid-write —
+remains open and is the main thing this document still asks for.
 
 ## Live hardware evidence
 
@@ -182,7 +192,8 @@ ESP32-P4 development Sidecar:
 - reconnecting one AccessPort restored the supported identity, high-speed
   endpoint contract, and normal `available` state without rebooting.
 
-Writes and deletes were compiled out. No sync or device mutation was attempted,
+Writes and deletes were compiled out *in the image used for this run*; both
+ship today. No sync or device mutation was attempted,
 and no USB packet trace was captured during this slice. The remaining matrix
 items—boot with both attached, conflict during read-only sync, reversed hub
 ports/enumeration order, unrelated USB hardware, accepted close/re-enumeration,

@@ -163,7 +163,13 @@ Claims here are limited to what has been verified on a real device.
   listing, deletion — but on separate occasions rather than as one transcript
 - Startup-screen replacement against a device
 - Powered-hub behavior with two AccessPorts attached
+- A second AccessPort arriving *during* a write or delete. Between
+  transactions the transport already refuses unless exactly one eligible
+  device is present, but the mid-operation path has not been exercised —
+  see docs/SINGLE_ACCESSPORT_SAFETY.md
 - Cooperative cancellation and shutdown *during* an active sync
+- Restoring a logical backup onto a card. The export side has run end to end;
+  the merge has only ever been host-tested
 
 Do not describe the unaccepted items as working, in documentation or in a
 release. If you accept one on real hardware, move it up and say what you
