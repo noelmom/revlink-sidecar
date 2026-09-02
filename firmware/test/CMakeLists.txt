@@ -385,10 +385,10 @@ target_compile_options(
     PRIVATE -Wall -Wextra -Werror -Wpedantic
 )
 
-add_executable(sync_header_pairing_test sync_header_pairing_test.c)
-target_link_libraries(sync_header_pairing_test PRIVATE revlink_sync)
+add_executable(sync_header_pairing_host_test sync_header_pairing_host_test.c)
+target_link_libraries(sync_header_pairing_host_test PRIVATE revlink_sync)
 target_compile_options(
-    sync_header_pairing_test
+    sync_header_pairing_host_test
     PRIVATE -Wall -Wextra -Werror -Wpedantic
 )
 
@@ -398,7 +398,7 @@ add_test(NAME accessport_catalog COMMAND catalog_host_test)
 add_test(NAME delete_allowlist COMMAND delete_target_host_test)
 add_test(NAME core_lifecycle_and_safety COMMAND core_host_test)
 add_test(NAME sync_manifest COMMAND manifest_host_test)
-add_test(NAME sync_header_pairing COMMAND sync_header_pairing_test)
+add_test(NAME sync_header_pairing COMMAND sync_header_pairing_host_test)
 add_test(NAME power_button COMMAND power_host_test)
 add_test(NAME storage_recovery COMMAND storage_recovery_host_test)
 add_test(NAME network_coordinator COMMAND network_host_test)

@@ -18,7 +18,7 @@
     --muted: #98a2ae;
     --line: #2c3238;
     --accent: #e04a44;
-    --accent-ink: #14171a;
+    --accent-ink: #000000;
     --code: #23282d;
   }
 }
@@ -103,6 +103,9 @@ a { color: var(--accent); }
 }
 
 .shot.narrow { max-width: 34rem; }
+
+/* Portrait phone footage: cap it so it does not dominate a desktop page. */
+.shot.clip { max-width: 22rem; }
 
 .shot.clip video {
   display: block;
@@ -207,3 +210,20 @@ footer {
 }
 
 footer p:first-child { margin-bottom: 1rem; }
+
+/* Topology diagram: the fastest answer to "how does this work" for anyone
+   who reads schematics before prose. Scrolls rather than wrapping, because
+   wrapped box-drawing is unreadable. */
+.topology {
+  margin: 1.4rem 0 1.6rem;
+  padding: .9rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--code);
+  color: var(--ink);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+.restate { border-top: 1px solid var(--line); padding-top: 1.6rem; }

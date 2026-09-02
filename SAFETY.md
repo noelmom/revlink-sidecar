@@ -39,7 +39,8 @@ directory on the AccessPort, not a damaged engine.
 It stays gated anyway, and the reason is not doubt about the code. The write
 path has been accepted on hardware and is in regular use; the gate is there
 because writing to someone's device is their decision to make, not a default
-to be assumed. Consent starts locked on every boot for that reason alone.
+to be assumed. Consent starts locked on a new or factory-reset Sidecar and
+persists in NVS until the owner changes it — it does not re-lock on reboot.
 
 ## Deletion is gated separately
 
@@ -61,12 +62,14 @@ delete is never transmitted for a file the device does not list. Each one is
 appended to an audit log on the card.
 
 From 0.2.2 the published image contains it. Compiling it in is not enabling
-it: delete consent is a separate runtime switch that starts locked on every
-boot until the owner sets it, and is never implied by agreeing to map
-transfers. The reason to ship it is the same reason writes ship — without a
+it: delete consent is a separate runtime switch, locked until the owner sets
+it and never implied by agreeing to map transfers. Like write consent it is
+stored in NVS, so once granted it stays granted until it is turned off. The reason to ship it is the same reason writes ship — without a
 computer, a full AccessPort cannot be cleared, and that is one of the two
 problems this project exists to solve. What deletion can cost you is a file
-you meant to keep; the Sidecar's own synced copy of it is kept either way.
+you meant to keep. The Sidecar's own synced copy survives a device delete —
+unless you separately choose to remove that too, which is the one action in
+the product that can leave a file nowhere.
 
 ## The two write gates
 

@@ -99,7 +99,8 @@ POST /api/portal/startup/apply
 Map and startup-screen write routes remain inert until the compiled
 administrator capability, persistent owner consent, one-device topology,
 identity pin, exact target validator, and operation-specific confirmation all
-agree. Deletion is not exposed.
+agree. Deletion is exposed the same way, through `/api/portal/file/delete`
+and `/api/portal/deletes`, behind its own consent.
 
 `status.attachedAccessPort` is the live, read-only identity of the single
 physically attached unit. `status.accessPort` is the independently selected

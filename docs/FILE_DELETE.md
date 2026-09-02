@@ -7,7 +7,9 @@ both open.
 **From 0.2.2 the published image contains this.**
 `CONFIG_REVLINK_ALLOW_DEVICE_DELETES` still defaults to `n` for anyone building
 their own, and the Nano product profile turns it on. Compiling it in is not
-enabling it: consent is a runtime switch that starts locked on every boot.
+enabling it: consent is a runtime switch, locked until the owner sets it. It
+is stored in NVS and stays set until it is turned off; it does not re-lock on
+reboot.
 
 ## Why it is gated apart from writes
 

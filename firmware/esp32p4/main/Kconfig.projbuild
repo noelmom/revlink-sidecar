@@ -397,8 +397,9 @@ config REVLINK_ALLOW_DEVICE_DELETES
         implied by it: agreeing to transfer maps onto a device is not agreeing
         to let this remove files from it.
 
-        Leave disabled. No published image should carry this until it has been
-        accepted on real hardware.
+        Accepted on hardware and compiled into the Nano product profile. The
+        runtime consent is separate, starts locked, and is what actually
+        permits a delete.
 
 config REVLINK_MAP_AUTO_APPLY_DEFAULT
     bool "Default staged-map auto-apply preference to enabled"

@@ -5,10 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RevLink Sidecar — use your AccessPort without a laptop</title>
 <meta name="description" content="An open-source ESP32-P4 that syncs your COBB AccessPort datalogs and maps to microSD and serves them to your phone. No PC, no cloud.">
-<meta property="og:title" content="RevLink Sidecar">
-<meta property="og:description" content="Use your AccessPort without a laptop. Open-source ESP32-P4 firmware, 3D-printable case, flash it from your browser.">
+<link rel="canonical" href="https://revlinkgarage.com/">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta property="og:site_name" content="RevLink Sidecar">
+<meta property="og:url" content="https://revlinkgarage.com/">
+<meta property="og:title" content="RevLink Sidecar — use your AccessPort without a laptop">
+<meta property="og:description" content="Open-source ESP32-P4 firmware that syncs your COBB AccessPort datalogs and maps to a microSD card and serves them to your phone. No PC, no cloud, no account.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="assets/sidecar-hero.jpg">
+<!-- Absolute: most scrapers will not resolve a relative og:image. -->
+<meta property="og:image" content="https://revlinkgarage.com/assets/sidecar-hero.webp">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="900">
+<meta property="og:image:alt" content="A RevLink Sidecar in a printed white case on a car dashboard, cabled to a pink COBB AccessPort.">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -28,6 +36,11 @@
       phone. Plug in, open a web page, and your files are there.
     </p>
 
+    <pre class="topology" aria-label="AccessPort connects by USB to the ESP32-P4 Sidecar, which serves your phone's browser over Wi-Fi and stores files on a microSD card.">
+AccessPort ──USB-A host──&gt; ESP32-P4 Sidecar ──Wi-Fi──&gt; your phone
+                                 │
+                              microSD</pre>
+
     <div class="cta">
       <a class="button primary" href="flash/">Flash it from your browser</a>
       <a class="button" href="https://github.com/noelmom/revlink-sidecar">Source on GitHub</a>
@@ -39,7 +52,7 @@
   </header>
 
   <figure class="shot">
-    <img src="assets/sidecar-hero.jpg" width="1600" height="900"
+    <img src="assets/sidecar-hero.webp" width="1600" height="900"
          alt="A RevLink Sidecar in a printed white case sitting on a car's dashboard next to a pink COBB AccessPort, connected by a USB cable.">
     <figcaption>On the dash, syncing from the AccessPort beside it.</figcaption>
   </figure>
@@ -47,22 +60,18 @@
   <figure class="shot clip">
     <video
       poster="assets/sidecar-sync-poster.webp"
-      width="1280" height="720"
-      autoplay muted loop playsinline preload="metadata"
-      aria-label="A Sidecar prototype on a car dashboard, cabled to a COBB AccessPort. Its small display reads REVLINK, SYNCING, BACKING UP LOGS, with a progress bar and the words KEEP CONNECTED.">
-      <source src="assets/sidecar-sync.webm" type="video/webm">
+      width="640" height="1130"
+      controls muted loop playsinline preload="none"
+      aria-label="A Sidecar prototype on a car dashboard, cabled to a COBB AccessPort. Its display reads REVLINK, SYNCING, BACKING UP LOGS, with a progress bar and the words KEEP CONNECTED.">
       <source src="assets/sidecar-sync.mp4" type="video/mp4">
+      <source src="assets/sidecar-sync.webm" type="video/webm">
       A Sidecar syncing from an AccessPort in a car, its display reading
-      SYNCING — BACKING UP LOGS.
+      SYNCING, BACKING UP LOGS.
     </video>
     <figcaption>
-      <strong>An early prototype, mid-sync, in the car.</strong>
-      This clip is from the first working build — a bare box on the dash, before
-      the printed enclosure and most of what the Sidecar now does. The project
-      has moved a long way since: the portal, the grapher, map transfers and
-      deletion all came afterwards. A current demo is on the way. It is here
-      because it is the clearest picture of the point — logs coming off the
-      AccessPort with no laptop anywhere.
+      <strong>An early prototype, mid-sync.</strong>
+      First working build: a bare box on the dash, before the case, the portal
+      and map transfers. A current demo is coming.
     </figcaption>
   </figure>
 
@@ -72,7 +81,7 @@
       <li>
         <strong>Syncs on its own.</strong>
         Plug in the AccessPort and new datalogs and maps copy to a microSD card
-        you own — incrementally, only what changed, checksum-verified.
+        you own. Only what changed, and every file checksum-verified.
       </li>
       <li>
         <strong>Puts maps back on, and clears space.</strong>
@@ -111,12 +120,13 @@
   </section>
 
   <section>
-    <h2>What it looks like</h2>
+    <h2>The portal, on a phone</h2>
     <p>
       The portal is served by the Sidecar itself and opens in any browser on
-      your phone or laptop. Nothing below is a mockup — these are real screens
+      your phone or laptop. Nothing below is a mockup. These are real screens
       from a Sidecar with an AccessPort plugged into it. Serial numbers and map
-      names have been changed.
+      names have been changed. The <em>Not registered</em> badge in the corner
+      is an optional, unfinished hostname feature; nothing here needs it.
     </p>
 
     <figure class="shot wide">
@@ -153,15 +163,15 @@
       <li>
         <img src="assets/ui-health.webp" width="780" height="1688" loading="lazy"
              alt="Vehicle Health showing a health score of 100, 93 percent confidence across 10 analyzed logs, and 8 preserved threshold signals.">
-        <span class="cap"><strong>Trends, not guesses</strong>
-          A rule-based pass over logs you already have. It reports its
-          confidence and shows the evidence it used.</span>
+        <span class="cap"><strong>Vehicle Health (beta)</strong>
+          Runs a fixed set of rules over logs you have already synced and shows
+          which ones tripped. No model, nothing sent anywhere.</span>
       </li>
     </ul>
   </section>
 
   <figure class="shot narrow">
-    <img src="assets/sidecar-oled.jpg" width="1200" height="900" loading="lazy"
+    <img src="assets/sidecar-oled.webp" width="1100" height="619" loading="lazy"
          alt="Close-up of the printed case showing a small OLED reading REVLINK, NO DEVICE, ACCESSPORT OFFLINE, CONNECT TO SYNC.">
     <figcaption>An optional OLED shows attach, sync, and network state at a glance.</figcaption>
   </figure>
@@ -177,6 +187,10 @@
       <li>No real-time tuning.</li>
       <li>No decoding or unlocking of protected map content.</li>
       <li>
+        No encryption on the portal. It is plain HTTP, meant for your own Wi-Fi
+        or the Sidecar's own hotspot. Don't port-forward it.
+      </li>
+      <li>
         It can copy a map <em>file</em> onto the AccessPort's own storage, but
         installing that map onto the ECU stays a deliberate action on the
         AccessPort itself. Writes and deletes ship locked, behind two separate
@@ -186,7 +200,7 @@
   </section>
 
   <section>
-    <h2>What you need</h2>
+    <h2>Parts list</h2>
     <ul class="plain">
       <li>A Waveshare <strong>ESP32-P4-NANO</strong> — around $30.</li>
       <li>A microSD card.</li>
@@ -206,21 +220,30 @@
   </section>
 
   <section>
-    <h2>Where it stands</h2>
+    <h2>What's proven on hardware</h2>
     <p>
-      Developed in the open, and in daily use on a real car. Reading —
-      enumerate, list, incrementally sync, verify by SHA-256, view — has been
-      accepted on real hardware. So has writing: maps have been transferred to
-      an attached AccessPort repeatedly in ordinary use, each one read back and
-      matched by SHA-256 before it was reported as done, including transfers
-      that happened unattended after a sync. Deleting files from
-      <code>maps/</code> and <code>datalog/</code> is accepted too. All three
-      are in the published build.
+      The current release is 0.2.5, and it runs on the maintainer's own car.
+      Syncing, checksum verification and the log viewer have been used on real
+      hardware for months. So have map writes: several different maps copied
+      onto an AccessPort in service, each read back and checksum-matched before
+      the Sidecar called it done, some of them unattended after a sync.
+      Deletes from <code>maps/</code> and <code>datalog/</code> have been
+      tested the same way. All three ship in the published image.
     </p>
     <p>
       <a href="https://github.com/noelmom/revlink-sidecar/blob/main/SAFETY.md">SAFETY.md</a>
       lists precisely what is and isn't proven. If something there is wrong,
       that's a bug worth reporting.
+    </p>
+  </section>
+
+  <section class="restate">
+    <div class="cta">
+      <a class="button primary" href="flash/">Flash it from your browser</a>
+      <a class="button" href="https://github.com/noelmom/revlink-sidecar">Source on GitHub</a>
+    </div>
+    <p class="fine">
+      Chromium browsers only for flashing. Apache-2.0, and nothing to sign up for.
     </p>
   </section>
 

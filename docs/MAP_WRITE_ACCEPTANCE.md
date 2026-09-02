@@ -24,7 +24,7 @@ CSV uploads seen in the capture corpus prove that the generic `0x1622`
 transaction is understood, but RevLink has no product workflow for writing
 datalog CSV files back to the AccessPort. CSV and every other destination are
 rejected before transport. Startup-screen validation and conversion are
-documented separately in [`IMAGES.md`](IMAGES.md).
+covered in [`FIRMWARE_ARCHITECTURE.md`](FIRMWARE_ARCHITECTURE.md).
 
 ## Current proof
 

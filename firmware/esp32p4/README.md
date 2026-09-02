@@ -699,8 +699,8 @@ The current source adds an OLED reconnect projection driven by the
 coordinator snapshot rather than a second timer: `WIFI LOST`, remaining
 seconds, elapsed-budget progress, and `HOTSPOT NEXT`. Sync and USB-safety
 messages keep priority. This display change is host-tested and builds in the
-onboarding image, but still requires the link-loss hardware acceptance listed
-in `TODO.md`.
+onboarding image, but the link-loss behaviour has not been accepted on
+hardware.
 
 The iPhone association required **Maximize Compatibility** so the phone
 advertised a compatible 2.4 GHz hotspot. The onboarding UI must surface that

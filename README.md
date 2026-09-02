@@ -67,7 +67,7 @@ This project reads and writes *files*. It is not a tuning tool.
 | Part | Notes |
 | --- | --- |
 | Waveshare **ESP32-P4-NANO** | Primary target. USB-A OTG high-speed host, 16 MB flash, 32 MB PSRAM. |
-| Waveshare **ESP32-P4-WIFI6-DEV-KIT** (SKU 32054) | Also supported. Needs a *separate* binary — P4 revision 3.x silicon vs the Nano's 1.x. |
+| Waveshare **ESP32-P4-WIFI6-DEV-KIT** (SKU 32054) | Supported, but build it yourself — no image is published for it. P4 revision 3.x silicon vs the Nano's 1.x, and the binaries are not interchangeable. |
 | microSD card | Stores all synced files. |
 | 1.3" SH1106 OLED (optional) | SPI. Status display. |
 | USB-C power bank | The reference build runs off an Anker Nano. The Sidecar powers the AccessPort as a USB host, so give it a real 5 V supply — never source VBUS from a GPIO. |
@@ -80,7 +80,8 @@ tried and retired — the full write-up is in
 
 > [!NOTE]
 > **Enclosure status.** This geometry has been printed and assembled — it is
-> the case in the photos above. The lid conceals the Ethernet jack, closes the
+> the case in the photos on [revlinkgarage.com](https://revlinkgarage.com/).
+> The lid conceals the Ethernet jack, closes the
 > donor case's switch slot and spare USB-A opening, and adds the centered OLED
 > window plus two guided side buttons for RST and BOOT.
 >
@@ -94,7 +95,7 @@ tried and retired — the full write-up is in
 ## Install
 
 **Easiest — flash from your browser:
-[revlinkgarage.com](https://revlinkgarage.com/)**
+[revlinkgarage.com/flash](https://revlinkgarage.com/flash/)**
 
 Open it in Chrome or Edge, plug the board in over USB-C, and click Flash. No
 toolchain, no command line. It reads the board's silicon revision first and refuses to write an
@@ -142,7 +143,7 @@ plain C11 with no ESP-IDF dependency, so they run on your laptop:
 ./scripts/ci-local.sh
 ```
 
-That runs 17 host suites, 4 Node-based portal tests, the web flasher tests,
+That runs 19 host suites, 7 Node-based portal tests, the web flasher tests,
 and the enclosure geometry baseline — about 20 seconds, and it needs only a C
 compiler. If you don't have CMake, the script compiles the tests directly with
 the same flags.

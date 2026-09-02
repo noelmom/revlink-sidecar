@@ -77,7 +77,8 @@ What this project does NOT contain and does NOT do:
   * It does not extract calibration data from a vehicle.
 
   * It reads and writes ordinary files on hardware the user already owns.
-    Writing is compiled out of published images entirely; see SAFETY.md.
+    Published images can write and delete files on that hardware, but both
+    arrive locked behind separate owner consents; see SAFETY.md.
 
 Modifying a vehicle may affect its warranty, emissions compliance, and legal
 road status. Using this software is the user's own responsibility, and it is
