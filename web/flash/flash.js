@@ -76,6 +76,7 @@ async function loadManifest() {
   manifest = await response.json();
   ui.release.textContent =
     `${manifest.name} ${manifest.version} · ${manifest.profile} · ` +
+    (manifest.commit ? `commit ${manifest.commit} · ` : "") +
     `ESP-IDF ${manifest.idfVersion} · built ${manifest.buildDate}`;
 }
 

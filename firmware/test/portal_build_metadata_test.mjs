@@ -20,11 +20,22 @@ test('portal footer exposes firmware build and compile timestamp', () => {
 
 test('status API sources build metadata from the running app image', () => {
   assert.match(portalService, /esp_app_get_description\(\)/);
-  assert.ok(
-    portalService.includes(
-      '"\\"build\\":{\\"version\\":%s,\\"date\\":%s,\\"time\\":%s},"',
-    ),
-  );
+  // Assert the fields the portal depends on, not the exact literal: adding a
+  // field to this object is a normal change and should not read as a failure.
+  for (const field of ['version', 'date', 'time', 'commit']) {
+    assert.ok(
+      portalService.includes(`\\"${field}\\":`),
+      `status build metadata is missing ${field}`,
+    );
+  }
+});
+
+test('the build commit comes from the build, not a hard-coded string', () => {
+  // A UI-only change alters the portal compiled into the firmware without
+  // changing the version, so the commit is what separates two such builds.
+  // It has to come from the build system or it cannot do that job.
+  assert.match(portalService, /REVLINK_GIT_COMMIT/);
+  assert.match(portal, /text\('buildCommit'/);
 });
 
 test('device cards consistently lead with the AccessPort model', () => {

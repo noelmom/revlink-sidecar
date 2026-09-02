@@ -5,7 +5,8 @@
       "id": "v0.2.1-nano",
       "version": "0.2.1",
       "profile": "nano",
-      "notes": "First immutable release directory."
+      "notes": "First immutable release directory.",
+      "commit": "7f99bb5a"
     }
   ]
 }
