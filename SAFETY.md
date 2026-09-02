@@ -129,6 +129,12 @@ Claims here are limited to what has been verified on a real device.
 - Byte-exact protocol reconstruction of the full captured request corpus
 - Wi-Fi client rejoin, fallback hotspot, and captive portal across cold boots
 - Two-second BOOT-button safe shutdown with an idle attached AccessPort
+- The BOOT double-press network shortcut. A standard `WIFI:T:WPA;S:…;P:…;`
+  join code is generated on the device and rendered on the SH1106, scanned
+  from a phone to join the Sidecar's hotspot. The panel is 128x64 and a
+  version-3 symbol is 29 modules, so it renders at 2x with almost nothing to
+  spare — that it scans reliably off a screen that small was the open question,
+  and it does
 - A complete logical backup export downloaded end to end, 128 files, with the
   device staying up throughout
 - A map staged with no AccessPort attached, surviving a power cycle: restored

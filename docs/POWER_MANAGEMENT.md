@@ -92,6 +92,14 @@ The double-press exists because "what is this thing's address" is the question
 every new user asks first, and answering it on the device is faster than
 explaining mDNS.
 
+The QR is a standard `WIFI:T:WPA;S:<ssid>;P:<password>;` join code built on the
+device, so any phone camera handles it — there is no app and nothing is looked
+up remotely. It necessarily contains the hotspot password, which is the point:
+the hotspot is a local fallback for joining the Sidecar itself, and anyone able
+to read the screen is already holding the device.
+
+Accepted on hardware: the code renders on the SH1106 and scans from a phone.
+
 ## Planned two-button controls
 
 Do not implement this behavior until the development-board button wiring has
