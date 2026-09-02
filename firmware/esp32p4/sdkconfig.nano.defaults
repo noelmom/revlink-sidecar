@@ -17,5 +17,17 @@ CONFIG_REVLINK_STATUS_OLED_ROTATE_180=y
 CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
 
 # Guarded device writes are part of the Nano product profile. Runtime owner
-# consent still defaults to locked, and deletion is not compiled.
+# consent still defaults to locked.
 CONFIG_REVLINK_ALLOW_DEVICE_WRITES=y
+
+# So is deletion, and for the same reason writes are: without a computer, a
+# full AccessPort cannot be cleared, and that is one of the two things the
+# Sidecar exists to fix. Only files directly inside maps/ and datalog/ can be
+# removed, every delete pins the device by part number and serial, requires
+# the file to be present first, and re-lists the directory afterwards to
+# confirm it is gone.
+#
+# Compiling it in is not enabling it. Delete consent is a separate runtime
+# switch from write consent, starts locked, is never implied by agreeing to
+# map transfers, and every delete is written to an on-card audit log.
+CONFIG_REVLINK_ALLOW_DEVICE_DELETES=y
