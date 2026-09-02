@@ -4,7 +4,7 @@ This document records requirements to review before the production RevLink
 hardware and firmware architecture is finalized. The ESP32-P4/ESP32-C6
 prototype is the active product path and already implements the bounded
 client-first/fallback-hotspot coordinator described here. An earlier
-Raspberry Pi reference build used a permanent single-purpose hotspot instead;
+The retired reference build used a permanent single-purpose hotspot instead;
 do not copy that two-radio prototype assumption into the Sidecar.
 
 ## Product baseline
@@ -77,7 +77,7 @@ OLED-advertised hotspot, received DHCP, and opened the captive setup page. A
 deliberately incorrect station password failed within the bounded transition,
 restored the same hotspot and password, and allowed the client to rejoin
 without re-entering the hotspot credential. A valid home-network submission
-then associated, received `192.168.1.237`, served HTTP on the LAN, and
+then associated, received a DHCP lease, served HTTP on the LAN, and
 published the working device-specific URL
 `http://revlink-<identity-v1-id>.local`. This was the accepted identity-v1 hostname; the
 current Nano field hostname is `http://revlink-<last-eight-mac>.local`.

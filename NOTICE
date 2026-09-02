@@ -21,9 +21,28 @@ Files under hardware/ are licensed under the Creative Commons
 Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0), included as
 LICENSE-hardware.
 
-The Nano enclosure is derived from a third-party 55 x 55 mm case for the
-Waveshare ESP32-P4-NANO. The unmodified donor geometry is retained under
-hardware/nano-enclosure/enclosure-print/source/ for reference and diffing.
+The Nano enclosure is a derivative work. The original is:
+
+    "Waveshare ESP32-P4-NANO case and board model"
+    by MartinFaustMayer, published 2025-11-29 on Printables
+    https://printables.com/@MartinFaustMa_212591
+    https://www.printables.com/model/1497431-waveshare-esp32-p4-nano-case-and-board-model
+    Licensed CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+The unmodified donor geometry is retained under
+hardware/nano-enclosure/enclosure-print/source/ for reference and diffing:
+esp32-p4-nano-board.stl, esp32-p4-nano-bottom.stl, esp32-p4-nano-top-solid.stl.
+
+CC BY 4.0 permits remixing, redistribution and commercial use provided the
+original author is credited. The three files in source/ remain CC BY 4.0 and
+must carry that credit wherever they are redistributed.
+
+The CC BY-SA 4.0 grant above applies to RevLink's own modifications: the
+revised lid, the OLED window, the guided side buttons, and the closed
+Ethernet, switch and spare USB-A openings. CC BY permits a derivative to add
+ShareAlike, so this is compatible; it does not and cannot relicense the donor
+geometry.
+
 
 --------------------------------------------------------------------------
 Trademarks

@@ -10,8 +10,15 @@
 > edge. Measure the physical OLED PCB, connector, solder joints, and wire exit
 > before exporting new geometry.
 
-This directory contains the Nano enclosure derived from the supplied
-55 × 55 mm case.
+This directory contains the Nano enclosure, a derivative of
+["Waveshare ESP32-P4-NANO case and board model"](https://www.printables.com/model/1497431-waveshare-esp32-p4-nano-case-and-board-model)
+by **MartinFaustMayer**, used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The unmodified donor STLs are kept in `source/` so the changes can be diffed.
+
+Remixing and commercial use are permitted; the author must be credited. The
+files in `source/` stay under CC BY 4.0.
+RevLink's own modifications are CC BY-SA 4.0 — see `../../../NOTICE`, which
+also carries the attribution.
 
 ## Open refinements
 

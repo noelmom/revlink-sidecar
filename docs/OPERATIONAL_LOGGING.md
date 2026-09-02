@@ -2,8 +2,7 @@
 
 RevLink operational evidence exists to diagnose Sidecar behavior without
 turning customer files, credentials, or vehicle data into an unbounded log.
-This policy applies to the ESP32-P4 product firmware and to the retained
-Linux/Raspberry Pi reference.
+This policy applies to the ESP32-P4 product firmware.
 
 ## Data classes
 
@@ -85,20 +84,31 @@ transport.
   history unavailable. The Sidecar continues with volatile logging and a clear
   storage-health state.
 
-## Linux/Raspberry Pi reference
+## Audit logs that ship today
 
-The retained Pi uses `journald`. Do not duplicate service output into
-repository files or an unbounded application log. Deployment guidance is:
+Two exceptions to "operational logging is volatile" already exist. Every
+device write and every device delete is appended to the card *before* the
+outcome is reported anywhere else, because an irreversible action on somebody
+else's hardware with no record is worse than a log file:
 
-- keep journal storage bounded by the host's normal system policy;
-- use `journalctl -u revlink.service` for local troubleshooting;
-- collect a time-bounded unit export only when requested;
-- redact usernames, IP addresses, SSIDs, AccessPort serials, and paths before
-  sharing; and
-- never run commands that dump the environment after credentials are loaded.
+```text
+/sdcard/revlink/system/acceptance/map-write-audit.log
+/sdcard/revlink/system/acceptance/file-delete-audit.log
+```
 
-The Pi's logs are development/reference evidence, not a cloud telemetry
-channel. They must not be copied into the ESP32-P4 product dataset.
+One line per operation: UTC timestamp, AccessPort part number and serial, the
+path, the outcome, the platform error code, and whether recovery is required.
+
+Three properties worth knowing before you rely on them:
+
+- **They are not rotated.** They grow without bound. In normal use that is a
+  few bytes per deliberate write or delete, but nothing trims them.
+- **They are not in a logical backup.** The backup export walks
+  `/sdcard/revlink/devices`; these live under `/sdcard/revlink/system`, so
+  they do not travel with a card backup and are lost with the card.
+- **They contain device identifiers** — part number and serial — which is the
+  point, and which is also why they are the one thing on the card to redact
+  before sharing a log with anyone.
 
 ## Acceptance before durable logging ships
 

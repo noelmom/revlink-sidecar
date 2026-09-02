@@ -177,6 +177,8 @@ docs/               Architecture, safety model, networking, storage, bring-up
 | [SINGLE_ACCESSPORT_SAFETY.md](docs/SINGLE_ACCESSPORT_SAFETY.md) | Why two attached AccessPorts fail closed instead of guessing |
 | [MAP_WRITE_ACCEPTANCE.md](docs/MAP_WRITE_ACCEPTANCE.md) | The gated round-trip procedure for map writes |
 | [FILE_DELETE.md](docs/FILE_DELETE.md) | Removing a file from the AccessPort, and why it is gated apart from writes |
+| [ACCEPTANCE_LOG.md](docs/ACCEPTANCE_LOG.md) | Dated bench records for the ESP32-P4 target. History, not current state |
+| [OPERATIONAL_LOGGING.md](docs/OPERATIONAL_LOGGING.md) | What is logged, what is not, and the two audit logs that ship |
 | [STAGED_MAPS.md](docs/STAGED_MAPS.md) | Uploading a map with no AccessPort attached, and applying it on the next sync |
 | [PRODUCT_NETWORKING.md](docs/PRODUCT_NETWORKING.md) | Client-first Wi-Fi with fallback hotspot and captive portal |
 | [ACCESSPORT_STORAGE_BEHAVIOR.md](docs/ACCESSPORT_STORAGE_BEHAVIOR.md) | How the device's filesystem actually behaves |
