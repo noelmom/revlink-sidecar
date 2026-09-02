@@ -67,28 +67,110 @@ test('the catalogue is saved before the payload is unlinked', () => {
 });
 
 test('the portal warns that no copy will remain, and offers the download', () => {
-  assert.match(portal, /confirmLosingLastCopy/);
   assert.match(portal, /no recycle bin/i);
-  assert.match(portal, /Download it first/i);
-  // The offer has to actually download, not just advise it.
-  assert.match(portal, /confirmLosingLastCopy[\s\S]{0,900}await downloadFile\(file\)/);
+  assert.match(portal, /will not exist anywhere/i);
+  // The offer has to actually download, not merely advise it.
+  const run = portal.slice(portal.indexOf('async function runDelete'));
+  assert.match(run, /losesLastCopy/);
+  assert.match(run, /await downloadFile\(file\)/);
 });
 
-test('removing both copies is a separate question from deleting one', () => {
-  // Bundled into one prompt, "delete" would quietly mean "destroy".
-  const fn = portal.slice(portal.indexOf('async function deleteDeviceFile'));
-  assert.match(fn, /Also remove the Sidecar\\u2019s cached copy/);
-  // Declining anywhere in the chain must fall back to keeping the copy.
-  assert.match(fn, /both=false/);
+test('every destructive choice is presented at once, not as a prompt chain', () => {
+  /*
+   * The first version asked a sequence of confirm() questions, which made the
+   * safe outcome depend on answering "cancel" to the right one. A dialog that
+   * names each place and what survives it is the honest shape for a choice
+   * with three outcomes.
+   */
+  assert.match(portal, /function openDeleteDialog/);
+  assert.match(portal, /Delete from the AccessPort/);
+  assert.match(portal, /Remove the Sidecar/);
+  assert.match(portal, /Remove it from both/);
+  for (const scope of ['device', 'sidecar', 'both']) {
+    assert.ok(
+      portal.includes(`runDelete(file,'${scope}')`),
+      `the dialog offers no ${scope} choice`,
+    );
+  }
 });
 
-test('the cache row offers removal even when no device is attached', () => {
-  // deletionAvailable() gates the AccessPort button on an attached device;
-  // the Sidecar button must not sit behind that same gate.
-  const row = portal.slice(portal.indexOf('const buttons=document.createElement'));
-  assert.match(row, /forgetCachedFile/);
-  assert.ok(
-    !/deletionAvailable\(\)[^\n]*forgetCachedFile/.test(row),
-    'removing the cached copy is gated on an attached AccessPort',
+test('only the choices that destroy the last copy are marked grave', () => {
+  const fn = portal.slice(
+    portal.indexOf('function openDeleteDialog'),
+    portal.indexOf('async function runDelete'),
   );
+  // Deleting from the device while the Sidecar keeps a copy is not grave, and
+  // dressing it in the same red as a permanent loss would train people to
+  // ignore the red.
+  assert.match(fn, /'Delete from the AccessPort',[\s\S]{0,220}false,/);
+  // Removing the cached copy is grave exactly when the device no longer has
+  // it, which is a per-file question rather than a fixed answer.
+  assert.match(fn, /file\.onDevice===false,\s*\(\)=>runDelete\(file,'sidecar'\)/);
+  assert.match(fn, /'Remove it from both',[\s\S]{0,260}true,/);
+});
+
+test('one row button, so a phone row stays readable', () => {
+  // Two red buttons side by side wrapped onto three lines at 375px and still
+  // left "Delete" and "Remove" to be told apart by guessing.
+  const row = portal.slice(
+    portal.indexOf('const buttons=document.createElement'),
+    portal.indexOf('const editor=document.createElement'),
+  );
+  assert.match(row, /openDeleteDialog\(file\)/);
+  assert.ok(
+    !/forgetCachedFile/.test(row),
+    'the row still carries a second delete button',
+  );
+});
+
+test('the delete button is offered whatever the device is doing', () => {
+  /*
+   * deletionAvailable() gates only the AccessPort choice inside the dialog.
+   * The row button itself must not sit behind it, or a file the Sidecar alone
+   * holds becomes undeletable — which is exactly the state that had files
+   * stuck on the card with no way to remove them.
+   */
+  const row = portal.slice(
+    portal.indexOf('const buttons=document.createElement'),
+    portal.indexOf('const editor=document.createElement'),
+  );
+  assert.ok(
+    !/deletionAvailable\(\)/.test(row),
+    'the row delete button is gated on an attached AccessPort',
+  );
+  const dialog = portal.slice(portal.indexOf('function openDeleteDialog'));
+  assert.match(dialog, /const onDevice=deletionAvailable\(\)&&file\.onDevice!==false/);
+});
+
+test('rows are redrawn when delete availability arrives late', () => {
+  /*
+   * The files and the status are fetched independently and the files usually
+   * land first, so rows were built while deletion still looked unavailable
+   * and were never rebuilt. Delete then never appeared, which is
+   * indistinguishable from the feature being missing.
+   */
+  assert.match(portal, /function refreshRowsIfDeletionChanged/);
+  assert.match(portal, /state\.rowsDrawnForDeletion/);
+  // Scope the search to renderStatus's own body by matching its braces, so
+  // this does not depend on how long that function happens to be.
+  const start = portal.indexOf('function renderStatus(data){');
+  assert.ok(start > 0, 'renderStatus not found');
+  let depth = 0;
+  let end = start;
+  for (let i = portal.indexOf('{', start); i < portal.length; i += 1) {
+    if (portal[i] === '{') depth += 1;
+    else if (portal[i] === '}') {
+      depth -= 1;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  const body = portal.slice(start, end);
+  assert.ok(
+    body.includes('refreshRowsIfDeletionChanged()'),
+    'renderStatus never re-checks the rows once the status lands',
+  );
+  // And loadFiles must record what it drew against, or the comparison in
+  // refreshRowsIfDeletionChanged has nothing to compare to.
+  const load = portal.slice(portal.indexOf('async function loadFiles'));
+  assert.match(load, /state\.rowsDrawnForDeletion=deletionAvailable\(\)/);
 });

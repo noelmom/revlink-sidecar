@@ -76,12 +76,21 @@ Since 0.2.3 the cached copy can be removed too, as a separate choice:
 | `sidecar` | The Sidecar's cached copy | Whatever the AccessPort has |
 | `both` | Both | Nothing |
 
+The portal asks with one **Delete** button per row that opens a dialog naming
+each place and what survives it. A chain of yes/no prompts was tried first and
+was worse: it made the safe outcome depend on answering "cancel" to the right
+question, and it needed two red buttons in every row, which wrapped onto three
+lines on a phone and still left "Delete" and "Remove" to be told apart by
+guessing.
+
+Only the choices that destroy the last copy are styled as grave — `both`
+always, and `sidecar` when the last completed listing did not find the file on
+the device. Deleting from the AccessPort while the Sidecar keeps a copy is not
+grave, and dressing it in the same red would train people to ignore the red.
+
 `both` is the only operation in the product that can leave a file existing
-nowhere, so the portal says that in those words and offers to download it
-first. It is also asked as a second question rather than bundled into the
-first, because "delete from the device" and "destroy the last copy" are
-different decisions and a single prompt would quietly turn one into the other.
-Declining at any point keeps the cached copy.
+nowhere, so the dialog says that in those words and offers to download it
+first.
 
 Order matters for `both`: the device delete goes first and the cached copy is
 dropped only once the device has confirmed. If the cache went first and the
