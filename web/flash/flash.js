@@ -308,10 +308,13 @@ async function flash() {
     });
 
     status("Restarting the Sidecar…");
-    await esploader.after("hard_reset");
+    const restarted = await restartBoard();
     status(
-      "Done. The Sidecar has restarted — look for its Wi-Fi network, or its " +
-      "OLED if one is fitted.",
+      restarted
+        ? "Done. The Sidecar has restarted — look for its Wi-Fi network, or "
+          + "its OLED if one is fitted."
+        : "Done, but the board could not be restarted automatically. Unplug "
+          + "it and plug it back in to run the new firmware.",
       "ok"
     );
   } catch (error) {
@@ -323,6 +326,45 @@ async function flash() {
   } finally {
     ui.disconnect.disabled = false;
     ui.connect.disabled = esploader !== null;
+  }
+}
+
+/*
+ * Pulse the board out of the bootloader.
+ *
+ * esptool-js's HardReset only lowers RTS:
+ *
+ *   async reset() { await delay(100); await this.transport.setRTS(false) }
+ *
+ * That assumes RTS is currently high and holding the chip in reset. Its own
+ * connect sequence ends with RTS already low, so on this board the call
+ * changes nothing and the Sidecar sits in the bootloader until it is power
+ * cycled by hand. Passing resetConstructors was necessary but not sufficient.
+ *
+ * Drive the whole pulse instead: DTR low so GPIO0 stays high and the chip
+ * boots the application rather than re-entering download mode, then RTS high
+ * to assert EN, hold, and release. This is the sequence native esptool uses,
+ * and the one that has reset this hardware reliably over a plain serial port.
+ */
+async function restartBoard() {
+  if (!transport?.setRTS || !transport?.setDTR) {
+    log("cannot restart: the transport exposes no control signals");
+    return false;
+  }
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  try {
+    // setDTR(false) is IO0 high, so the chip boots the application rather
+    // than re-entering download mode. setRTS(true) is EN low: in reset.
+    await transport.setDTR(false);
+    await transport.setRTS(true);
+    await pause(150);
+    await transport.setRTS(false);
+    await pause(50);
+    log("restarted the board (EN pulsed via RTS)");
+    return true;
+  } catch (error) {
+    log(`could not restart the board automatically: ${error.message}`);
+    return false;
   }
 }
 
