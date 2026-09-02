@@ -7,7 +7,14 @@ import {
 } from "./vendor/esptool-js-0.6.1.js";
 import { evaluateGate, parseRevision } from "./gate.js";
 
-const RELEASE = "firmware/v0.2.0-nano";
+/*
+ * Which build to serve is data, not code. Release directories are immutable
+ * once published — a version string has to name one set of bytes, or a bug
+ * report against it means nothing — so publishing adds a directory and moves
+ * this pointer rather than overwriting anything.
+ */
+const RELEASES = "releases.json";
+let RELEASE = null;
 
 /*
  * Transfer speed. A USB-serial bridge that syncs happily at 460800 can
@@ -58,6 +65,12 @@ const terminal = {
 };
 
 async function loadManifest() {
+  const index = await fetch(RELEASES, { cache: "no-store" });
+  if (!index.ok) throw new Error(`releases ${index.status}`);
+  const { current } = await index.json();
+  if (!current) throw new Error("no current release is named");
+  RELEASE = `firmware/${current}`;
+
   const response = await fetch(`${RELEASE}/manifest.json`, { cache: "no-store" });
   if (!response.ok) throw new Error(`manifest ${response.status}`);
   manifest = await response.json();

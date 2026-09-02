@@ -1,6 +1,6 @@
 {
   "name": "RevLink Sidecar",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "profile": "nano",
   "buildDate": "2026-09-02",
   "idfVersion": "v6.0.2",
@@ -40,7 +40,7 @@
       "path": "revlink-sidecar.bin",
       "offset": 131072,
       "size": 1389840,
-      "sha256": "eda9c36046bf0ada0603622657ad1ab055a0e7cb2b30f25881a4d61e9ddaf2da"
+      "sha256": "5678173f144c467b9186e4ab9a3b620ee9cd3fb1696f79b073b48230bdcfb56a"
     }
   ]
 }

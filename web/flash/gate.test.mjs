@@ -10,16 +10,17 @@ import { evaluateGate, parseRevision } from "./gate.js";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /*
- * Read the release directory out of flash.js rather than repeating it here.
- * Hard-coding it once meant these tests kept checking a release the page no
- * longer serves, which is the one failure mode a release test must not have.
+ * Follow the same pointer the page follows, rather than naming a release here.
+ * A hard-coded copy once left these tests checking a release the page no
+ * longer served, which is the one failure mode a release test must not have.
  */
-const flashSource = readFileSync(join(here, "flash.js"), "utf8");
-const releaseMatch = /const RELEASE = "([^"]+)"/.exec(flashSource);
-if (!releaseMatch) {
-  throw new Error("could not find the RELEASE constant in flash.js");
+const releases = JSON.parse(
+  readFileSync(join(here, "releases.json"), "utf8")
+);
+if (!releases.current) {
+  throw new Error("releases.json names no current release");
 }
-const RELEASE = join(here, releaseMatch[1]);
+const RELEASE = join(here, "firmware", releases.current);
 const manifest = JSON.parse(
   readFileSync(join(RELEASE, "manifest.json"), "utf8")
 );
@@ -120,6 +121,34 @@ test("parts do not overlap in flash", () => {
       `${previous.path} ends at 0x${end.toString(16)} which overruns ` +
         `${sorted[i].path} at 0x${sorted[i].offset.toString(16)}`
     );
+  }
+});
+
+test("the manifest version matches the release directory it lives in", () => {
+  // A version string has to name one set of bytes. If a directory called
+  // v0.2.1-nano can contain a manifest saying 0.2.0, the version means
+  // nothing and a bug report against it cannot be resolved.
+  const expected = releases.current.replace(/^v/, "").replace(/-.*$/, "");
+  assert.equal(
+    manifest.version,
+    expected,
+    `manifest says ${manifest.version} but lives in ${releases.current}`
+  );
+});
+
+test("every release named in releases.json exists and verifies", () => {
+  for (const entry of releases.releases ?? []) {
+    const dir = join(here, "firmware", entry.id);
+    const m = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
+    assert.equal(m.version, entry.version, `${entry.id}: version disagrees`);
+    for (const part of m.parts) {
+      const bytes = readFileSync(join(dir, part.path));
+      assert.equal(
+        createHash("sha256").update(bytes).digest("hex"),
+        part.sha256,
+        `${entry.id}/${part.path}: digest mismatch`
+      );
+    }
   }
 });
 

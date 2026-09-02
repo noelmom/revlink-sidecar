@@ -599,7 +599,7 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         response,
         6100U,
         "{"
-        "\"build\":{\"version\":%s,\"date\":%s,\"time\":%s},"
+        "\"build\":{\"version\":%s,\"date\":%s,\"time\":%s,\"commit\":\"%s\"},"
         "\"accessPortCatalog\":{\"revision\":\"%s\",\"partCount\":%u},"
         "\"identity\":{\"ssid\":%s,\"hostname\":%s,"
         "\"deviceId\":%s,\"hardwareMac\":%s,\"collisionIndex\":%u},"
@@ -639,6 +639,11 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         escaped_build_version,
         escaped_build_date,
         escaped_build_time,
+#ifdef REVLINK_GIT_COMMIT
+        REVLINK_GIT_COMMIT,
+#else
+        "unknown",
+#endif
         REVLINK_ACCESSPORT_CATALOG_REVISION,
         (unsigned int)revlink_accessport_catalog_count(),
         escaped_ssid,

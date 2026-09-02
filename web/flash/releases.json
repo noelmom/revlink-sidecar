@@ -1,0 +1,11 @@
+{
+  "current": "v0.2.1-nano",
+  "releases": [
+    {
+      "id": "v0.2.1-nano",
+      "version": "0.2.1",
+      "profile": "nano",
+      "notes": "First immutable release directory."
+    }
+  ]
+}

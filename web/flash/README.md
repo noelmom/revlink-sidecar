@@ -57,29 +57,56 @@ Every part is fetched, size-checked, and SHA-256 verified against
 tampered mirror fails before flashing, not halfway through it.
 
 `gate.test.mjs` additionally verifies that the published binaries match their
-recorded digests, that flash regions do not overlap, and that the published
-image really is the read-only build — by asserting the write-path log strings
-are absent from the binary, rather than trusting the manifest's own flag.
+recorded digests, that flash regions do not overlap, and that the image agrees
+with what the manifest claims about device writes — by looking for the
+write-path log strings in the binary rather than trusting the manifest's own
+flag, in either direction.
+
+## Releases are immutable
+
+```
+releases.json                    {"current": "v0.2.1-nano"}
+firmware/v0.2.1-nano/            binaries + manifest.json + SHA256SUMS
+firmware/v0.2.2-nano/            the next one, alongside it
+```
+
+A published release directory is never rewritten. A version string has to name
+one set of bytes: if two different binaries both call themselves 0.2.0, a bug
+report against 0.2.0 cannot be resolved, and someone comparing behaviour
+between two boards has nothing to compare. Version 0.2.0 was overwritten
+repeatedly while this repository was being built and was removed rather than
+left as a false reference.
+
+Publishing therefore *adds* a directory and moves the pointer in
+`releases.json`. The page and the tests both read that pointer, so nothing has
+to be edited in two places, and older releases stay reachable for anyone who
+needs to go back to a build that worked.
+
+`gate.test.mjs` enforces the parts of this that can be checked: the manifest
+version must match the directory it lives in, and every release named in
+`releases.json` must exist with digests that verify.
 
 ## Cutting a new release
 
 ```bash
-# 1. Build the profile you intend to publish.
+# 1. Bump firmware/esp32p4/version.txt. Every published build gets its own
+#    version; commits between publishes do not need one.
+# 2. Build the profile you intend to publish.
 source "$HOME/.espressif/frameworks/esp-idf-v6.0.2/export.sh"
-B="$PWD/build-release/nano-readonly"
-D='sdkconfig.defaults;sdkconfig.oled.defaults;sdkconfig.wifi-scan.defaults;sdkconfig.wifi-join.defaults;sdkconfig.network-runtime.defaults;sdkconfig.onboarding.defaults;sdkconfig.nano.defaults;sdkconfig.release-readonly.defaults'
+B="$PWD/build-release/nano"
+D='sdkconfig.defaults;sdkconfig.oled.defaults;sdkconfig.wifi-scan.defaults;sdkconfig.wifi-join.defaults;sdkconfig.network-runtime.defaults;sdkconfig.onboarding.defaults;sdkconfig.nano.defaults'
 idf.py -C firmware/esp32p4 -B "$B" \
   -D "SDKCONFIG=$B/sdkconfig" -D "SDKCONFIG_DEFAULTS=$D" \
   set-target esp32p4 build
 
-# 2. Copy the four artefacts into web/flash/firmware/<version>-<profile>/
-#    as bootloader.bin, partition-table.bin, ota-data-initial.bin,
-#    and revlink-sidecar.bin.
-# 3. Regenerate manifest.json (offsets come from the build's flash_args)
-#    and SHA256SUMS.
-# 4. Point RELEASE in flash.js at the new directory.
-# 5. Run ./scripts/ci-local.sh — the manifest and binary assertions must pass.
-# 6. Flash a real board before publishing.
+# 3. Copy the four artefacts into a NEW web/flash/firmware/<version>-<profile>/
+#    as bootloader.bin, partition-table.bin, ota-data-initial.bin and
+#    revlink-sidecar.bin. Never into an existing one.
+# 4. Write its manifest.json and SHA256SUMS.
+# 5. Add it to releases.json and set "current" to it.
+# 6. Run ./scripts/ci-local.sh — the manifest, version and digest assertions
+#    must pass.
+# 7. Flash a real board before announcing it.
 ```
 
 Offsets for the current partition table:
@@ -97,10 +124,9 @@ Web Serial is Chromium-only — Chrome, Edge, Opera, Arc, Brave. Safari and
 Firefox do not implement it, and the page says so plainly instead of failing
 mysteriously.
 
-## Not yet verified
+## Driver support
 
-The Nano's programming console runs through an onboard WCH USB-serial bridge.
-Whether that bridge enumerates without a vendor driver on a **clean** macOS
-and a **clean** Windows install has not been tested. If a driver turns out to
-be required, that needs to be stated prominently on this page before the
-project is announced anywhere.
+The Nano's programming console runs through an onboard WCH USB-serial bridge
+(`1a86:55d3`). No driver is needed: confirmed on a clean Windows 11 machine and
+on macOS, where the board enumerates on its own and flashes without anything
+being installed first.

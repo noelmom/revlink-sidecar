@@ -29,4 +29,36 @@ idf_build_set_property(
 # stale tag and disagreeing with every other place the version appears. It
 # also makes the version depend on git state, so a build from a tarball or a
 # shallow clone reports something different again.
+# The commit this image was built from. A UI change alters the portal that is
+# compiled into the firmware without necessarily changing the version, so the
+# version alone cannot identify a build. Reported alongside it in the portal.
+#
+# Resolved at configure time, so a rebuild after committing without
+# reconfiguring keeps the previous value. Release builds run set-target, which
+# reconfigures, and a dirty tree is marked as such.
+execute_process(
+    COMMAND git -C "${CMAKE_CURRENT_LIST_DIR}" rev-parse --short=8 HEAD
+    OUTPUT_VARIABLE REVLINK_GIT_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT REVLINK_GIT_COMMIT)
+    set(REVLINK_GIT_COMMIT "unknown")
+else()
+    execute_process(
+        COMMAND git -C "${CMAKE_CURRENT_LIST_DIR}" status --porcelain
+        OUTPUT_VARIABLE REVLINK_GIT_DIRTY
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(NOT REVLINK_GIT_DIRTY STREQUAL "")
+        set(REVLINK_GIT_COMMIT "${REVLINK_GIT_COMMIT}-dirty")
+    endif()
+endif()
+idf_build_set_property(
+    COMPILE_DEFINITIONS "REVLINK_GIT_COMMIT=\"${REVLINK_GIT_COMMIT}\""
+    APPEND
+)
+message(STATUS "RevLink build commit: ${REVLINK_GIT_COMMIT}")
+
 project(revlink_esp32p4)

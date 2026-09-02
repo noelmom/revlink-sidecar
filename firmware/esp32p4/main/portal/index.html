@@ -293,6 +293,7 @@
       </div>
       <footer class="build-footer" aria-label="Firmware build information">
         <span id="buildVersion">Firmware build loading…</span>
+        <span id="buildCommit">Commit loading…</span>
         <span id="buildTimestamp">Compile time loading…</span>
       </footer>
     </main>
@@ -521,6 +522,10 @@
       state.status=data;const{device,accessPort,sync,storage,network,identity,safety}=data,attachedAccessPort=data.attachedAccessPort||{known:false};
       const build=data.build||{};
       text('buildVersion',`Firmware ${build.version||'unknown'}`);
+      // The portal is compiled into the firmware, so a UI-only change produces
+      // a different build at the same version. The commit is what separates
+      // them.
+      text('buildCommit',build.commit?`Commit ${build.commit}`:'Commit unknown');
       text('buildTimestamp',build.date&&build.time?`Built ${build.date} · ${build.time}`:'Compile time unavailable');
       const attached=device.attached,ready=device.available,active=sync.active,conflict=device.state==='multiple-devices';
       const selectedKnown=Boolean(accessPort?.known),selectedIsAttached=Boolean(selectedKnown&&attachedAccessPort.known&&accessPort.serial===attachedAccessPort.serial);
