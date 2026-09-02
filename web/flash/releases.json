@@ -1,6 +1,13 @@
 {
-  "current": "v0.2.2-nano",
+  "current": "v0.2.3-nano",
   "releases": [
+    {
+      "id": "v0.2.3-nano",
+      "version": "0.2.3",
+      "profile": "nano",
+      "notes": "Remove cached copies from the Sidecar, not just files from the AccessPort.",
+      "commit": "9f2d2380"
+    },
     {
       "id": "v0.2.2-nano",
       "version": "0.2.2",
