@@ -21,7 +21,7 @@ without being asked; see automatic application below.
 | Upload a map file | **Gated** | Compile flag + persistent owner consent. Copies a `.ptm` onto the AccessPort's storage; it does not install anything onto an ECU |
 | Auto-apply a staged map | **Gated** | The above, plus a separate preference and a matching pinned device — see [STAGED_MAPS.md](docs/STAGED_MAPS.md) |
 | Replace the startup screen | **Gated** | Fixed destination only |
-| Delete | **Not implemented as a product feature** | Destructive; not part of the tuner workflow |
+| Delete a file | **Gated, and compiled out of published images** | `maps/` and `datalog/` only, one level deep. Its own compile flag and its own consent, neither implied by the write gates |
 | ECU flashing / live tuning | **Out of scope permanently** | Not a goal of this project |
 
 ## What a "write" is here
@@ -35,6 +35,26 @@ That is why the published image ships with writes compiled in: the failure
 this project can plausibly cause is a damaged file or a confused `maps/`
 directory on the AccessPort, not a damaged engine. It is still gated, because
 the write path has not completed its hardware round-trip.
+
+## Deletion is gated separately
+
+Deletion has its own compile flag (`CONFIG_REVLINK_ALLOW_DEVICE_DELETES`,
+default `n`) and its own runtime consent. Neither is implied by the write
+gates.
+
+That separation is the point. Agreeing to copy maps onto a device is not
+agreeing to let this remove files from it, and a shared flag would convert one
+decision into the other. Deletion also has no undo: the AccessPort keeps no
+recycle bin, and the Sidecar holds nothing back beyond whatever it had already
+synchronised.
+
+Only a file directly inside `maps/` or `datalog/` can be removed — not
+`images/`, not the directories themselves, nothing nested, no traversal. Every
+delete pins the device by part number and serial, requires the file to be
+present first, and re-lists the directory afterwards to confirm it is gone. A
+delete is never transmitted for a file the device does not list.
+
+Published images do not contain any of it.
 
 ## The two write gates
 
@@ -102,6 +122,10 @@ Claims here are limited to what has been verified on a real device.
 - A staged map applied automatically, with nobody pressing anything: written
   after a clean sync to the AccessPort it was pinned to, and verified by
   read-back (`MAP WRITE VERIFIED ... ready/completion/readback=passed`)
+- Deleting a file from an AccessPort: refused while consent was locked, refused
+  for every path outside the allowlist, then removed and confirmed absent by
+  re-listing (`FILE DELETED ... confirmed_absent=yes`). A second attempt at the
+  same path was refused without transmitting anything
 - Writing a map to an AccessPort. On the first live pass the device accepted
   the file and a later read-only session recovered the exact bytes and digest.
   That pass reported a misleading `ESP_ERR_INVALID_CRC` only because the local

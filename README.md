@@ -36,10 +36,10 @@ Everything runs on the device. Your files land on a microSD card you own.
   evidence it used.
 - **Multi-device.** Keeps separate datasets per AccessPort, so a shop can
   service several cars without mixing files.
-- **Stage a map without the device.** Upload a `.ptm` while the AccessPort is
-  unplugged; it is pinned to that car, survives a power cycle, and can be
-  written on the next attach. Off by default — see
-  [SAFETY.md](SAFETY.md).
+- **Stage a map without the device.** Save a `.ptm` while the AccessPort is
+  unplugged; it is pinned to that car and survives a power cycle. Transfer it
+  by hand when the device is next connected, or let it apply automatically
+  after the next sync — that part is off until you turn it on.
 - **Direct download and share.** Pull individual CSVs, or hand them to your
   phone's native share sheet.
 - **OLED status.** Optional 1.3" SH1106 shows attach, sync, and network state
@@ -52,8 +52,11 @@ This project reads and writes *files*. It is not a tuning tool.
 
 - **No ECU flashing.** Not now, not planned.
 - **No real-time tuning or live ECU writes.**
-- **Map writes are locked by default** behind both a compile-time flag and a
-  persistent owner consent setting. See [SAFETY.md](SAFETY.md).
+- **Map writes arrive locked** and stay off until you enable them. Copying a
+  `.ptm` onto the AccessPort's storage is not the same as installing it — that
+  remains a deliberate action on the AccessPort itself.
+- **File deletion is compiled out** of published images, behind its own flag
+  and its own consent. See [SAFETY.md](SAFETY.md).
 - **No public internet exposure.** The portal has no transport encryption and
   is meant for a trusted local network.
 
@@ -95,10 +98,11 @@ Open it in Chrome or Edge, plug the board in over USB-C, and click Flash. No
 toolchain, no command line. It reads the board's silicon revision first and refuses to write an
 image built for the other P4 variant.
 
-The published image is **read-only**: it lists, downloads, verifies, and
-displays what's on your AccessPort, and cannot write to it. Map upload is
-compiled out of that build entirely, because reading has been accepted on
-hardware and writing has not.
+The published image can read your AccessPort and, once you turn it on, copy a
+`.ptm` map file back onto it. Writing arrives **locked**: you enable it in
+Settings, only `maps/*.ptm` is accepted, and every write is read back and
+checked against its SHA-256. Deleting files is compiled out of published
+images entirely.
 
 See [`web/flash/`](web/flash/) to host the page yourself.
 
@@ -133,13 +137,15 @@ plain C11 with no ESP-IDF dependency, so they run on your laptop:
 ./scripts/ci-local.sh
 ```
 
-That runs 16 host suites, 4 Node-based portal tests, and the enclosure
-geometry baseline — about 20 seconds, and it needs only a C compiler. If you
-don't have CMake, the script compiles the tests directly with the same flags.
+That runs 17 host suites, 4 Node-based portal tests, the web flasher tests,
+and the enclosure geometry baseline — about 20 seconds, and it needs only a C
+compiler. If you don't have CMake, the script compiles the tests directly with
+the same flags.
 
-Add `--full` to also build the firmware two ways (writes enabled and
-disabled). That one needs ESP-IDF v6.0.2 plus CMake and Ninja, and takes
-about two minutes.
+Add `--full` to also build the firmware three ways: writes enabled, deletion
+compiled in, and writes compiled out. Building every configuration is what
+catches code that only compiles under one of them. That needs ESP-IDF v6.0.2
+plus CMake and Ninja.
 
 ```bash
 ./scripts/ci-local.sh --full
@@ -164,6 +170,7 @@ docs/               Architecture, safety model, networking, storage, bring-up
 | [FIRMWARE_ARCHITECTURE.md](docs/FIRMWARE_ARCHITECTURE.md) | Component boundaries, device lifecycle, stable contracts |
 | [SINGLE_ACCESSPORT_SAFETY.md](docs/SINGLE_ACCESSPORT_SAFETY.md) | Why two attached AccessPorts fail closed instead of guessing |
 | [MAP_WRITE_ACCEPTANCE.md](docs/MAP_WRITE_ACCEPTANCE.md) | The gated round-trip procedure for map writes |
+| [FILE_DELETE.md](docs/FILE_DELETE.md) | Removing a file from the AccessPort, and why it is gated apart from writes |
 | [STAGED_MAPS.md](docs/STAGED_MAPS.md) | Uploading a map with no AccessPort attached, and applying it on the next sync |
 | [PRODUCT_NETWORKING.md](docs/PRODUCT_NETWORKING.md) | Client-first Wi-Fi with fallback hotspot and captive portal |
 | [ACCESSPORT_STORAGE_BEHAVIOR.md](docs/ACCESSPORT_STORAGE_BEHAVIOR.md) | How the device's filesystem actually behaves |
