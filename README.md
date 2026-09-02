@@ -66,12 +66,23 @@ This project reads and writes *files*. It is not a tuning tool.
 
 | Part | Notes |
 | --- | --- |
-| Waveshare **ESP32-P4-NANO** | Primary target. USB-A OTG high-speed host, 16 MB flash, 32 MB PSRAM. |
+| Waveshare **ESP32-P4-NANO** | Primary target. USB-A OTG high-speed host, 16 MB flash, 32 MB PSRAM. [Buy][aff-nano] |
 | Waveshare **ESP32-P4-WIFI6-DEV-KIT** (SKU 32054) | Supported, but build it yourself — no image is published for it. P4 revision 3.x silicon vs the Nano's 1.x, and the binaries are not interchangeable. |
-| microSD card | Stores all synced files. |
-| 1.3" SH1106 OLED (optional) | SPI. Status display. |
-| USB-C power bank | The reference build runs off an Anker Nano. The Sidecar powers the AccessPort as a USB host, so give it a real 5 V supply — never source VBUS from a GPIO. |
+| microSD card | Stores all synced files. Any capacity. [Buy][aff-sd] |
+| 1.3" SH1106 OLED (optional) | SPI, not I2C. Status display. [Buy][aff-oled] |
+| USB-C power bank | The reference build runs off an Anker Nano ([buy][aff-bank]). The Sidecar powers the AccessPort as a USB host, so give it a real 5 V supply — never source VBUS from a GPIO. |
 | 3D-printed enclosure | [`hardware/nano-enclosure/`](hardware/nano-enclosure/) |
+
+[aff-nano]: https://amzn.to/462r0q8
+[aff-sd]: https://amzn.to/4h381C1
+[aff-oled]: https://amzn.to/46BiJJQ
+[aff-bank]: https://amzn.to/4gxIFfp
+
+> **Affiliate disclosure.** The **Buy** links above are Amazon affiliate links.
+> As an Amazon Associate I earn from qualifying purchases, at no extra cost to
+> you. They point at the exact parts this was built and tested on, which is why
+> they are here rather than a generic search. Buy them anywhere you like —
+> nothing in this project depends on where the hardware came from.
 
 **Why ESP32-P4 and not an S3?** The S3's native USB host is full-speed only,
 and the AccessPort's 512-byte bulk endpoints require high speed. The S3 was

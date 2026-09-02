@@ -203,10 +203,20 @@ AccessPort ──USB-A host──&gt; ESP32-P4 Sidecar ──Wi-Fi──&gt; you
   <section>
     <h2>Parts list</h2>
     <ul class="plain">
-      <li>A Waveshare <strong>ESP32-P4-NANO</strong> — around $30.</li>
-      <li>A microSD card.</li>
-      <li>A USB-C power bank. The reference build runs off an Anker Nano.</li>
-      <li>Optional: a 1.3&Prime; SH1106 OLED for status at a glance.</li>
+      <li>
+        A Waveshare <strong>ESP32-P4-NANO</strong>, around $30 —
+        <a href="https://amzn.to/462r0q8" rel="sponsored nofollow noopener">the board this runs on</a>.
+        Not the ESP32-P4-WIFI6-DEV-KIT, which is different silicon.
+      </li>
+      <li>A microSD card — <a href="https://amzn.to/4h381C1" rel="sponsored nofollow noopener">any will do</a>.</li>
+      <li>
+        A USB-C power bank. The reference build runs off an
+        <a href="https://amzn.to/4gxIFfp" rel="sponsored nofollow noopener">Anker Nano</a>.
+      </li>
+      <li>
+        Optional: a 1.3&Prime; SH1106 OLED for status at a glance —
+        <a href="https://amzn.to/46BiJJQ" rel="sponsored nofollow noopener">the SPI one</a>, not I2C.
+      </li>
       <li>
         Optional: the
         <a href="https://github.com/noelmom/revlink-sidecar/tree/main/hardware/nano-enclosure">3D-printable case</a>
@@ -217,6 +227,13 @@ AccessPort ──USB-A host──&gt; ESP32-P4 Sidecar ──Wi-Fi──&gt; you
       The ESP32-P4-WIFI6-DEV-KIT works too, but needs its own build: it uses
       different silicon and the images are not interchangeable. The flasher
       checks which board you have before writing anything.
+    </p>
+    <p class="fine">
+      <strong>Affiliate disclosure.</strong> The parts links above are Amazon
+      affiliate links. As an Amazon Associate I earn from qualifying purchases,
+      at no extra cost to you. They point at the exact parts this was built and
+      tested on, which is the reason they are here; buy them anywhere you like.
+      Nothing in the project depends on where the hardware came from.
     </p>
   </section>
 
