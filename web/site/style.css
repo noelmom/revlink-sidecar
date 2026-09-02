@@ -104,6 +104,46 @@ a { color: var(--accent); }
 
 .shot.narrow { max-width: 34rem; }
 
+/* Screenshot tour. The phone shots are tall and narrow, so they go in a grid
+   that collapses to one column rather than being scaled down until the text
+   inside them is unreadable. */
+.screens {
+  display: grid;
+  gap: 1.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.screens li { margin: 0; }
+
+.screens img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #0a0f16;
+}
+
+.screens .cap {
+  display: block;
+  margin-top: .7rem;
+  font-size: .88rem;
+  color: var(--muted);
+}
+
+.screens .cap strong {
+  display: block;
+  color: var(--ink);
+  font-size: .95rem;
+  margin-bottom: .15rem;
+}
+
+/* The grapher is a wide shot; give it the full column above the phone grid. */
+.shot.wide { margin-bottom: 1.8rem; }
+
 figcaption {
   margin-top: .6rem;
   font-size: .88rem;

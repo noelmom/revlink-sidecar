@@ -88,6 +88,56 @@
     </ul>
   </section>
 
+  <section>
+    <h2>What it looks like</h2>
+    <p>
+      The portal is served by the Sidecar itself and opens in any browser on
+      your phone or laptop. Nothing below is a mockup — these are real screens
+      from a Sidecar with an AccessPort plugged into it. Serial numbers and map
+      names have been changed.
+    </p>
+
+    <figure class="shot wide">
+      <img src="assets/ui-graph.webp" width="2000" height="1281" loading="lazy"
+           alt="The datalog grapher showing three stacked charts from one pull: RPM climbing through two gear changes, boost and manifold pressure, and wastegate duty against throttle position.">
+      <figcaption>
+        A real pull, graphed on the device. Split view gives each channel its
+        own axis; presets group the channels that are usually read together.
+      </figcaption>
+    </figure>
+
+    <ul class="screens">
+      <li>
+        <img src="assets/ui-dashboard.webp" width="780" height="1688" loading="lazy"
+             alt="Dashboard showing the connected AccessPort, its part number, vehicle and firmware, and a completed synchronization of 72 verified files.">
+        <span class="cap"><strong>Knows what's plugged in</strong>
+          Part number, vehicle and firmware, and whether this dataset is the
+          device in front of you.</span>
+      </li>
+      <li>
+        <img src="assets/ui-datalogs.webp" width="780" height="1688" loading="lazy"
+             alt="Datalog list, each row badged Sidecar and AccessPort, showing which map each log was recorded on, with CSV, Details and Delete buttons.">
+        <span class="cap"><strong>Every log, with its map</strong>
+          Badges say where each file actually lives. Logs remember which map
+          they were recorded on.</span>
+      </li>
+      <li>
+        <img src="assets/ui-maps.webp" width="780" height="1688" loading="lazy"
+             alt="Maps tab with a tuner workflow card: choose a .ptm file, save it to the Sidecar, or transfer it to the connected AccessPort.">
+        <span class="cap"><strong>Maps, both directions</strong>
+          Save a tuner's map with the AccessPort unplugged; it transfers on its
+          own next time you connect.</span>
+      </li>
+      <li>
+        <img src="assets/ui-health.webp" width="780" height="1688" loading="lazy"
+             alt="Vehicle Health showing a health score of 100, 93 percent confidence across 10 analyzed logs, and 8 preserved threshold signals.">
+        <span class="cap"><strong>Trends, not guesses</strong>
+          A rule-based pass over logs you already have. It reports its
+          confidence and shows the evidence it used.</span>
+      </li>
+    </ul>
+  </section>
+
   <figure class="shot narrow">
     <img src="assets/sidecar-oled.jpg" width="1200" height="900" loading="lazy"
          alt="Close-up of the printed case showing a small OLED reading REVLINK, NO DEVICE, ACCESSPORT OFFLINE, CONNECT TO SYNC.">
