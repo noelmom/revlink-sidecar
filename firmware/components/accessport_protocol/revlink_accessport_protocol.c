@@ -654,6 +654,89 @@ static bool ascii_equal_case_insensitive(uint8_t left, uint8_t right)
     return left == right;
 }
 
+/*
+ * Body-identical to a download; only the opcode differs. Kept as its own
+ * function rather than a parameter on the download builder so a delete can
+ * never be produced by accident from a read path.
+ */
+revlink_ap_status_t revlink_ap_build_delete(
+    const uint8_t *name,
+    size_t name_length,
+    const uint8_t *path,
+    size_t path_length,
+    uint8_t *output,
+    size_t output_capacity,
+    size_t *output_length
+)
+{
+    size_t payload_length = 37U;
+    if ((name_length > 0U && name == NULL) || (path_length > 0U && path == NULL)
+        || !checked_add(payload_length, name_length, &payload_length)
+        || !checked_add(payload_length, path_length, &payload_length)) {
+        return REVLINK_AP_INVALID_ARGUMENT;
+    }
+
+    size_t record_length = 0;
+    byte_writer_t writer = {0};
+    revlink_ap_status_t status = begin_record(
+        REVLINK_AP_OPCODE_DELETE,
+        payload_length,
+        output,
+        output_capacity,
+        &record_length,
+        &writer
+    );
+    if (status != REVLINK_AP_OK) {
+        return status;
+    }
+    const uint8_t marker[] = {0x00, 0x01};
+    if (!writer_bytes(&writer, marker, sizeof(marker))
+        || !writer_lp(&writer, name, name_length)
+        || !writer_zeros(&writer, 27U)
+        || !writer_lp(&writer, path, path_length)) {
+        return REVLINK_AP_INVALID_ARGUMENT;
+    }
+    return finish_record(output, record_length, &writer, output_length);
+}
+
+revlink_ap_status_t revlink_ap_validate_delete_target(
+    const uint8_t *path,
+    size_t path_length
+)
+{
+    static const uint8_t maps_prefix[] = "maps/";
+    static const uint8_t datalog_prefix[] = "datalog/";
+
+    if (path == NULL) {
+        return REVLINK_AP_INVALID_ARGUMENT;
+    }
+
+    size_t file_offset = 0U;
+    if (path_length > sizeof(maps_prefix) - 1U
+        && memcmp(path, maps_prefix, sizeof(maps_prefix) - 1U) == 0) {
+        file_offset = sizeof(maps_prefix) - 1U;
+    } else if (path_length > sizeof(datalog_prefix) - 1U
+        && memcmp(path, datalog_prefix, sizeof(datalog_prefix) - 1U) == 0) {
+        file_offset = sizeof(datalog_prefix) - 1U;
+    } else {
+        return REVLINK_AP_UPLOAD_TARGET_REJECTED;
+    }
+
+    /*
+     * One file, directly inside that directory. A separator here would mean a
+     * subdirectory, and ".." anywhere would mean traversal; neither is a thing
+     * this product deletes.
+     */
+    for (size_t index = file_offset; index < path_length; ++index) {
+        if (path[index] == '\0' || path[index] == '/' || path[index] == '\\'
+            || (path[index] == '.' && index + 1U < path_length
+                && path[index + 1U] == '.')) {
+            return REVLINK_AP_UPLOAD_TARGET_REJECTED;
+        }
+    }
+    return REVLINK_AP_OK;
+}
+
 revlink_ap_status_t revlink_ap_validate_upload_target(
     const uint8_t *path,
     size_t path_length,

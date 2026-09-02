@@ -22,6 +22,7 @@ extern "C" {
 #define REVLINK_AP_OPCODE_DOWNLOAD 0x1620U
 #define REVLINK_AP_OPCODE_TEMP_NOTICE 0x1621U
 #define REVLINK_AP_OPCODE_UPLOAD 0x1622U
+#define REVLINK_AP_OPCODE_DELETE 0x1625U
 #define REVLINK_AP_OPCODE_LIST 0x1626U
 #define REVLINK_AP_IDENTITY_HANDSHAKE_COUNT 4U
 #define REVLINK_AP_IDENTITY_RESPONSE_INDEX 2U
@@ -250,6 +251,36 @@ revlink_ap_status_t revlink_ap_validate_upload_target(
     size_t path_length,
     uint32_t file_size,
     revlink_ap_upload_kind_t *kind
+);
+
+/*
+ * Build the capture-verified 0x1625 delete request. The body is byte-identical
+ * to a 0x1620 download: the device distinguishes the two by opcode alone.
+ *
+ * A successful delete is acknowledged by a class-0x01 mini record carrying the
+ * ASCII payload "15" — no 0x1601 listing and no temp-path notice.
+ */
+revlink_ap_status_t revlink_ap_build_delete(
+    const uint8_t *name,
+    size_t name_length,
+    const uint8_t *path,
+    size_t path_length,
+    uint8_t *output,
+    size_t output_capacity,
+    size_t *output_length
+);
+
+/*
+ * Enforce RevLink's product delete allowlist, which is deliberately narrower
+ * than the protocol permits: one file directly inside maps/ or datalog/, no
+ * traversal, no subdirectories, and never a directory itself.
+ *
+ * Delete is irreversible and the device offers no undo, so this refuses
+ * anything it cannot positively recognise rather than passing it through.
+ */
+revlink_ap_status_t revlink_ap_validate_delete_target(
+    const uint8_t *path,
+    size_t path_length
 );
 
 revlink_ap_status_t revlink_ap_validate_record(

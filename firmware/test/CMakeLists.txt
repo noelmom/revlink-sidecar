@@ -212,6 +212,15 @@ add_executable(protocol_host_cli protocol_host_cli.c)
 target_link_libraries(protocol_host_cli PRIVATE revlink_accessport_protocol)
 target_compile_options(protocol_host_cli PRIVATE -Wall -Wextra -Werror -Wpedantic)
 
+add_executable(delete_target_host_test delete_target_host_test.c)
+target_link_libraries(
+    delete_target_host_test PRIVATE revlink_accessport_protocol
+)
+target_compile_options(
+    delete_target_host_test
+    PRIVATE -Wall -Wextra -Werror -Wpedantic
+)
+
 add_executable(catalog_host_test catalog_host_test.c)
 target_link_libraries(catalog_host_test PRIVATE revlink_accessport_catalog)
 target_compile_options(catalog_host_test PRIVATE -Wall -Wextra -Werror -Wpedantic)
@@ -359,6 +368,7 @@ target_compile_options(
 enable_testing()
 add_test(NAME protocol_unit COMMAND protocol_host_cli self-test)
 add_test(NAME accessport_catalog COMMAND catalog_host_test)
+add_test(NAME delete_allowlist COMMAND delete_target_host_test)
 add_test(NAME core_lifecycle_and_safety COMMAND core_host_test)
 add_test(NAME sync_manifest COMMAND manifest_host_test)
 add_test(NAME power_button COMMAND power_host_test)
