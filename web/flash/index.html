@@ -77,6 +77,10 @@
       no such entry, the cable is charge-only or the board isn't in download
       mode.
     </p>
+    <p class="fine">
+      No driver is needed. Tested on a clean Windows 11 machine and on macOS,
+      the board appears on its own.
+    </p>
   </section>
 
   <section class="panel actions">
@@ -139,10 +143,16 @@
   <section class="panel">
     <h2>After flashing</h2>
     <p>
-      The Sidecar restarts and either rejoins a Wi-Fi network it already knows
-      or starts its own <code>RevLink-…</code> hotspot. Join it and open
-      <code>http://revlink-&lt;id&gt;.local</code>, or the address shown on the
-      OLED if you fitted one.
+      The Sidecar restarts on its own and either rejoins a Wi-Fi network it
+      already knows or starts its own <code>RevLink-…</code> hotspot. Join it
+      and open <code>http://revlink-&lt;id&gt;.local</code>, or the address
+      shown on the OLED if you fitted one.
+    </p>
+    <p class="fine">
+      An OLED stays frozen on its last frame <em>during</em> the write. Nothing
+      can draw to it then: the application isn't running, the chip's boot ROM
+      is. The splash after the restart names the firmware version, so you can
+      see at a glance which build is now on the board.
     </p>
     <p>
       Something not right?

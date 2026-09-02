@@ -1,4 +1,10 @@
-import { ESPLoader, Transport } from "./vendor/esptool-js-0.6.1.js";
+import {
+  ESPLoader,
+  Transport,
+  HardReset,
+  ClassicReset,
+  UsbJtagSerialReset,
+} from "./vendor/esptool-js-0.6.1.js";
 import { evaluateGate, parseRevision } from "./gate.js";
 
 const RELEASE = "firmware/v0.2.0-nano";
@@ -177,13 +183,24 @@ async function connect() {
   try {
     status("Select the Sidecar's serial port…");
     const port = await navigator.serial.requestPort();
-    transport = new Transport(port, true);
+    transport = new Transport(port, false);
     esploader = new ESPLoader({
       transport,
       baudrate: selectedBaud(),
       romBaudrate: 115200,
       terminal,
       enableTracing: false,
+      /*
+       * Without these, after("hard_reset") finds no constructor and returns
+       * having done nothing — silently, with no error. That is why the board
+       * sat in the bootloader after a successful write and had to be power
+       * cycled by hand, on every operating system.
+       */
+      resetConstructors: {
+        hardReset: (t, usingUsbOtg) => new HardReset(t, usingUsbOtg),
+        classicReset: (t, delay) => new ClassicReset(t, delay),
+        usbJTAGSerialReset: (t) => new UsbJtagSerialReset(t),
+      },
     });
 
     status("Connecting…");
@@ -290,7 +307,8 @@ async function flash() {
       },
     });
 
-    await esploader.after();
+    status("Restarting the Sidecar…");
+    await esploader.after("hard_reset");
     status(
       "Done. The Sidecar has restarted — look for its Wi-Fi network, or its " +
       "OLED if one is fitted.",

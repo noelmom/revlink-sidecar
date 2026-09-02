@@ -8,6 +8,7 @@
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_log_level.h"
 #include "esp_timer.h"
@@ -257,7 +258,30 @@ static void draw_splash(uint32_t elapsed_ms)
     const int phase = (int)(elapsed_ms / 80U);
     draw_portal_mark(10, 18, phase);
     draw_text(34, 20, "REVLINK", 2);
-    draw_text(35, 39, "SYSTEM ONLINE", 1);
+    /*
+     * The firmware version, not a fixed greeting. Nothing can be drawn while
+     * the board is being flashed — the application is not running, the ROM
+     * bootloader is, and the panel simply holds whatever frame was left on it.
+     * The first thing it draws afterwards is therefore the only chance to show
+     * that anything changed, so make it say which build is now running.
+     */
+    const esp_app_desc_t *description = esp_app_get_description();
+    /*
+     * esp_app_desc_t::version is 32 bytes and a git-describe fallback fills
+     * most of it, so bound the copy rather than let a long version silently
+     * truncate the label in front of it.
+     */
+    char banner[40];
+    (void)snprintf(
+        banner,
+        sizeof(banner),
+        "FIRMWARE %.*s",
+        16,
+        description != NULL && description->version[0] != '\0'
+            ? description->version
+            : "UNKNOWN"
+    );
+    draw_centered(39, banner, 1);
     fill_rect(8, 55, 112, 2, false);
     draw_rect(8, 54, 112, 4);
     const int width = (int)((elapsed_ms * 108U) / OLED_SPLASH_MS);
