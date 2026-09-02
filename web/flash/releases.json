@@ -1,6 +1,13 @@
 {
-  "current": "v0.2.4-nano",
+  "current": "v0.2.5-nano",
   "releases": [
+    {
+      "id": "v0.2.5-nano",
+      "version": "0.2.5",
+      "profile": "nano",
+      "notes": "Deleting a file actually removes it. Cache edits no longer require an active sync session.",
+      "commit": "40749418"
+    },
     {
       "id": "v0.2.4-nano",
       "version": "0.2.4",

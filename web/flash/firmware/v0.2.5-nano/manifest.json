@@ -1,0 +1,48 @@
+{
+  "name": "RevLink Sidecar",
+  "version": "0.2.5",
+  "profile": "nano",
+  "buildDate": "2026-09-02",
+  "idfVersion": "v6.0.2",
+  "chipFamily": "ESP32-P4",
+  "deviceWrites": true,
+  "notes": "Nano product profile. Guarded AccessPort writes and guarded deletion of files inside maps/ and datalog/ are compiled in; both runtime consents are separate switches and both default to locked. The Sidecar's own cached copies can also be removed, which needs no device and no AccessPort consent.",
+  "silicon": {
+    "maxMajorRevisionExclusive": 3,
+    "targetBoard": "Waveshare ESP32-P4-NANO",
+    "rejectMessage": "This build targets the ESP32-P4-NANO, which uses pre-v3 P4 silicon. The board you connected reports revision v{rev}, which is the Dev Kit's v3.x silicon. ESP-IDF treats these as incompatible targets, so this image will not boot on it."
+  },
+  "flash": {
+    "mode": "dio",
+    "frequency": "80m",
+    "size": "16MB"
+  },
+  "parts": [
+    {
+      "path": "bootloader.bin",
+      "offset": 8192,
+      "size": 23280,
+      "sha256": "bdf5d6d34ce198efba1e5c9c4a97bb93ac1a9b1c51f1b0a0e51f50ee3f3293eb"
+    },
+    {
+      "path": "partition-table.bin",
+      "offset": 32768,
+      "size": 3072,
+      "sha256": "e0ab66bf6b4565319200f4f1d3939be7c39d35f4fa7fc0d2f7cbefcdbd3133c6"
+    },
+    {
+      "path": "ota-data-initial.bin",
+      "offset": 61440,
+      "size": 8192,
+      "sha256": "7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f"
+    },
+    {
+      "path": "revlink-sidecar.bin",
+      "offset": 131072,
+      "size": 1408400,
+      "sha256": "e0cbcdc97758c2f1a3c4ba3f70cd87f5ea2a40bf4f2c881918bc8d7fd37dd421"
+    }
+  ],
+  "commit": "40749418",
+  "deviceDeletes": true
+}
