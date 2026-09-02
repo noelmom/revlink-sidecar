@@ -138,6 +138,11 @@ Claims here are limited to what has been verified on a real device.
   for every path outside the allowlist, then removed and confirmed absent by
   re-listing (`FILE DELETED ... confirmed_absent=yes`). A second attempt at the
   same path was refused without transmitting anything
+- Removing the Sidecar's own cached copy, and removing a file from both places
+  in one action — the case that leaves no copy anywhere. Accepted on 0.2.5,
+  after two releases in which the button was drawn, the request was sent, and
+  the firmware refused it with no visible symptom beyond the file staying
+  where it was
 - Writing maps to an AccessPort, repeatedly and in ordinary use — not a single
   lab pass. The maintainer has transferred several different maps to a device
   in service, each read back and matched by SHA-256 before being reported as

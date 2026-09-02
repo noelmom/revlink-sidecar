@@ -139,3 +139,26 @@ FILE DELETED: part=AP3-SUB-004 path=maps/UI Flow Test.ptm confirmed_absent=yes
 
 and a second attempt at the same path refused with `ESP_ERR_NOT_FOUND` and
 `sent=no`.
+
+Removing the Sidecar's own copy, and removing a file from both places at once,
+were accepted on 0.2.5 — including the case that leaves no copy anywhere.
+
+Getting there took three releases, and the first two are worth recording
+because each looked identical from the outside: the row simply did not change.
+
+1. **0.2.2** offered no button at all for a file the last listing had not found
+   on the device, which was the intended behaviour for an AccessPort delete and
+   left nothing to remove the cached copy with.
+2. **0.2.4** fixed a render race — rows decide whether to offer Delete from the
+   status, but the files usually arrive first, so rows were built while
+   deletion looked unavailable and were never rebuilt.
+3. **0.2.5** fixed the actual refusal. Both cache operations guarded on
+   `storage_device.selected`, which is cleared by `revlink_sd_release_device()`
+   at the end of every sync. The portal keeps showing files because the
+   published projection survives that, so for most of the time the portal is in
+   use there are rows on screen and no manifest behind them. Every call was
+   rejected, on exactly the files being displayed.
+
+The common thread is that a refused request and a successful no-op look the
+same in a list that does not change. The endpoint's error text now reaches the
+portal's toast verbatim, so a refusal names itself.
