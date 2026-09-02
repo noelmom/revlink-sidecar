@@ -2420,6 +2420,22 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
     }
 
     /*
+     * Both scopes edit the same catalogue, so neither may run while a sync is
+     * rewriting it. This is checked before the scope split rather than only
+     * on the device path.
+     */
+    const revlink_sync_snapshot_t sync_state = revlink_runtime_sync_snapshot();
+    if (sync_state.state == REVLINK_SYNC_QUEUED
+        || sync_state.state == REVLINK_SYNC_RUNNING
+        || sync_state.state == REVLINK_SYNC_CANCELLING) {
+        return send_json(
+            request,
+            "409 Conflict",
+            "{\"error\":\"Wait for synchronization to finish\"}"
+        );
+    }
+
+    /*
      * Clearing the Sidecar's own cache never speaks to an AccessPort, so it
      * needs neither one attached nor the consent that governs writing to one.
      * That consent exists to protect somebody's device; the microSD is the
@@ -2444,7 +2460,8 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
             forgotten == ESP_ERR_NOT_FOUND ? "404 Not Found" : "409 Conflict",
             forgotten == ESP_ERR_NOT_FOUND
                 ? "{\"error\":\"The Sidecar has no cached copy of that file\"}"
-                : "{\"error\":\"Select a dataset before removing cached files\"}"
+                : "{\"error\":\"The Sidecar could not open this dataset's cache. "
+                  "Reload the page and try again.\"}"
         );
     }
 
@@ -2487,17 +2504,6 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
             "{\"error\":\"Select the attached AccessPort dataset first\"}"
         );
     }
-    const revlink_sync_snapshot_t sync = revlink_runtime_sync_snapshot();
-    if (sync.state == REVLINK_SYNC_QUEUED
-        || sync.state == REVLINK_SYNC_RUNNING
-        || sync.state == REVLINK_SYNC_CANCELLING) {
-        return send_json(
-            request,
-            "409 Conflict",
-            "{\"error\":\"Wait for synchronization to finish\"}"
-        );
-    }
-
     const esp_err_t status =
         revlink_file_delete_request(&identity, path, touch_cache);
     if (status == ESP_OK) {

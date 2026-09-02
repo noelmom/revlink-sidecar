@@ -50,6 +50,61 @@ test('the cached copy is dropped only after the device confirms', () => {
   assert.match(observe, /DELETE_FAILED[\s\S]{0,200}forget_cached_copy = false/);
 });
 
+test('editing the catalogue attaches to the displayed dataset first', () => {
+  /*
+   * revlink_sd_release_device() runs at the end of every sync: it clears the
+   * selection and re-initialises the in-memory manifest to empty. The portal
+   * keeps showing files because the published projection survives that, so
+   * for most of the time the portal is in use there are rows on screen and no
+   * manifest behind them.
+   *
+   * Guarding on storage_device.selected therefore rejected essentially every
+   * cache deletion — the button worked, the request was refused, and the file
+   * stayed exactly where it was.
+   */
+  assert.match(storage, /static esp_err_t attach_displayed_dataset/);
+  for (const fn of ['revlink_sd_forget_cached', 'revlink_sd_mark_absent']) {
+    const body = storage.slice(
+      storage.indexOf(`esp_err_t ${fn}(const char *path)`),
+    ).slice(0, 700);
+    assert.match(
+      body,
+      /attach_displayed_dataset\(&attached_here\)/,
+      `${fn} does not attach before editing the catalogue`,
+    );
+    assert.match(
+      body,
+      /if \(attached_here\)[\s\S]{0,220}revlink_sd_release_device/,
+      `${fn} attaches without detaching again`,
+    );
+  }
+  // And the bodies must not re-apply the guard that caused this. Scoped to
+  // these two: revlink_sd_download_begin needs a live session and keeps it,
+  // legitimately, because a download has nowhere to write without one.
+  for (const fn of ['forget_cached_locked', 'mark_absent_locked']) {
+    const start = storage.indexOf(`static esp_err_t ${fn}(const char *path)\n{`);
+    assert.ok(start > 0, `${fn} not found`);
+    const body = storage.slice(start, storage.indexOf('\n}\n', start));
+    assert.ok(
+      !/storage_device\.selected/.test(body),
+      `${fn} still refuses to run without a live session`,
+    );
+  }
+});
+
+test('neither delete scope can run while a sync rewrites the catalogue', () => {
+  // Both scopes edit the same manifest, so the check belongs before the scope
+  // split rather than only on the device path.
+  const handler = service.slice(service.indexOf('portal_file_delete_handler'));
+  const syncCheck = handler.indexOf('Wait for synchronization to finish');
+  const scopeSplit = handler.indexOf('if (touch_cache && !touch_device)');
+  assert.ok(syncCheck > 0 && scopeSplit > 0);
+  assert.ok(
+    syncCheck < scopeSplit,
+    'a cache delete can run while a sync is rewriting the manifest',
+  );
+});
+
 test('a shared cache object survives while another entry points at it', () => {
   // The cache is content-addressed: two paths with identical bytes share one
   // object. Unlinking on the first removal would break the second file.

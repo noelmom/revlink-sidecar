@@ -174,6 +174,10 @@ static esp_err_t derive_device_key(
 );
 static esp_err_t make_directory(const char *path);
 static revlink_sd_file_kind_t kind_for_manifest_path(const char *path);
+static esp_err_t load_identity_for_key(
+    const char *key,
+    revlink_ap_device_info_t *identity
+);
 static bool copy_identity_value(
     const char *contents,
     const char *name,
@@ -1949,6 +1953,69 @@ void revlink_sd_device_scan_end(void *context, bool complete)
 }
 
 /*
+ * Attaches to the dataset the portal is displaying, if nothing is holding it
+ * already.
+ *
+ * The in-memory manifest only exists while a namespace is selected, and
+ * revlink_sd_release_device() runs at the end of every sync: it clears the
+ * selection and re-initialises the manifest to empty. The portal keeps
+ * showing files because the published projection survives that, so for most
+ * of the time the portal is in use there are rows on screen and no manifest
+ * behind them. Anything that edits the catalogue outside a session therefore
+ * has to attach first, exactly as the offline device switcher does, or it
+ * finds nothing to edit and fails while the row it was asked about is still
+ * plainly visible.
+ *
+ * Sets *attached_here when this call did the attaching and the caller must
+ * detach again afterwards.
+ */
+static esp_err_t forget_cached_locked(const char *path);
+static esp_err_t mark_absent_locked(const char *path);
+
+static esp_err_t attach_displayed_dataset(bool *attached_here)
+{
+    *attached_here = false;
+    if (storage_device.selected) {
+        return sync_manifest_ready && sync_manifest != NULL
+            ? ESP_OK : ESP_ERR_INVALID_STATE;
+    }
+    if (portal_snapshot_mutex == NULL
+        || xSemaphoreTake(portal_snapshot_mutex, pdMS_TO_TICKS(250))
+            != pdTRUE) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const bool known = portal_snapshot.namespace_known;
+    const revlink_ap_device_info_t displayed = portal_snapshot.device;
+    xSemaphoreGive(portal_snapshot_mutex);
+    if (!known || displayed.serial[0] == '\0') {
+        return ESP_ERR_INVALID_STATE;
+    }
+    char key[REVLINK_SD_DEVICE_KEY_HEX_BYTES + 1U];
+    if (derive_device_key(displayed.serial, key) != ESP_OK) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    /*
+     * Read the identity back from the card rather than trusting the
+     * projection, so the namespace opened here is the one the key names.
+     */
+    revlink_ap_device_info_t identity = {0};
+    esp_err_t status = load_identity_for_key(key, &identity);
+    if (status != ESP_OK) {
+        return status;
+    }
+    status = revlink_sd_select_device(NULL, &identity);
+    if (status != ESP_OK) {
+        return status;
+    }
+    if (!sync_manifest_ready || sync_manifest == NULL) {
+        revlink_sd_release_device(NULL);
+        return ESP_ERR_INVALID_STATE;
+    }
+    *attached_here = true;
+    return ESP_OK;
+}
+
+/*
  * Drops a note and a map tag for one exact file version. Called only when the
  * last manifest entry carrying that digest has gone, so nothing can still be
  * displaying them.
@@ -1993,10 +2060,21 @@ static void forget_annotations_for_digest(
 esp_err_t revlink_sd_forget_cached(const char *path)
 {
     if (path == NULL || path[0] == '\0') return ESP_ERR_INVALID_ARG;
-    if (!storage_device.selected || !sync_manifest_ready
-        || sync_manifest == NULL) {
-        return ESP_ERR_INVALID_STATE;
+    bool attached_here = false;
+    const esp_err_t attached = attach_displayed_dataset(&attached_here);
+    if (attached != ESP_OK) return attached;
+    const esp_err_t status = forget_cached_locked(path);
+    if (attached_here) {
+        /* Publish before detaching: releasing the namespace re-initialises
+         * the in-memory manifest, so the projection has to be refreshed from
+         * it while it is still there. */
+        revlink_sd_release_device(NULL);
     }
+    return status;
+}
+
+static esp_err_t forget_cached_locked(const char *path)
+{
     const size_t path_length = strlen(path);
     const revlink_sync_manifest_entry_t *entry = revlink_sync_manifest_find(
         sync_manifest,
@@ -2077,9 +2155,18 @@ esp_err_t revlink_sd_forget_cached(const char *path)
 esp_err_t revlink_sd_mark_absent(const char *path)
 {
     if (path == NULL || path[0] == '\0') return ESP_ERR_INVALID_ARG;
-    if (!sync_manifest_ready || sync_manifest == NULL) {
-        return ESP_ERR_INVALID_STATE;
+    bool attached_here = false;
+    const esp_err_t attached = attach_displayed_dataset(&attached_here);
+    if (attached != ESP_OK) return attached;
+    const esp_err_t status = mark_absent_locked(path);
+    if (attached_here) {
+        revlink_sd_release_device(NULL);
     }
+    return status;
+}
+
+static esp_err_t mark_absent_locked(const char *path)
+{
     const size_t length = strlen(path);
     if (!revlink_sync_manifest_set_presence(
             sync_manifest,
