@@ -1752,6 +1752,9 @@ void app_main(void)
         .write = revlink_sd_download_write,
         .commit = revlink_sd_download_commit,
         .abort = revlink_sd_download_abort,
+        .scan_begin = revlink_sd_device_scan_begin,
+        .scan_observe = revlink_sd_device_scan_observe,
+        .scan_end = revlink_sd_device_scan_end,
     };
     const esp_err_t sink_status =
         revlink_accessport_usb_configure_download_sink(&download_sink);

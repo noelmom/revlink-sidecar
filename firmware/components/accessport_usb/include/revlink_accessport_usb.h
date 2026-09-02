@@ -52,6 +52,24 @@ typedef struct {
     );
     esp_err_t (*commit)(void *context);
     void (*abort)(void *context);
+    /*
+     * Optional. Reports what the AccessPort's own directory listings said was
+     * on it during a sync, so the sink can tell a file it still caches from
+     * one the device no longer has.
+     *
+     * scan_end's `complete` is true only when every collection was listed and
+     * the session was neither cancelled nor cut short. It is false far more
+     * often than it is a failure — a cancelled sync is a perfectly normal
+     * thing — and the sink is expected to discard the pass rather than treat
+     * a partial listing as evidence of absence.
+     */
+    void (*scan_begin)(void *context);
+    void (*scan_observe)(
+        void *context,
+        const uint8_t *path,
+        size_t path_length
+    );
+    void (*scan_end)(void *context, bool complete);
 } revlink_accessport_download_sink_t;
 
 typedef void (*revlink_accessport_sync_observer_t)(

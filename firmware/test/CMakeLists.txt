@@ -365,6 +365,26 @@ target_compile_options(
     PRIVATE -Wall -Wextra -Werror -Wpedantic
 )
 
+add_library(
+    revlink_oled_render
+    ../components/revlink_oled_render/revlink_oled_render.c
+)
+target_include_directories(
+    revlink_oled_render
+    PUBLIC ../components/revlink_oled_render/include
+)
+target_compile_options(
+    revlink_oled_render
+    PRIVATE -Wall -Wextra -Werror -Wpedantic
+)
+
+add_executable(oled_render_host_test oled_render_host_test.c)
+target_link_libraries(oled_render_host_test PRIVATE revlink_oled_render)
+target_compile_options(
+    oled_render_host_test
+    PRIVATE -Wall -Wextra -Werror -Wpedantic
+)
+
 enable_testing()
 add_test(NAME protocol_unit COMMAND protocol_host_cli self-test)
 add_test(NAME accessport_catalog COMMAND catalog_host_test)
@@ -383,6 +403,7 @@ add_test(NAME control_service COMMAND control_host_test)
 add_test(NAME status_model COMMAND status_host_test)
 add_test(NAME cli_contract COMMAND cli_host_test)
 add_test(NAME staged_map COMMAND staged_map_host_test)
+add_test(NAME oled_splash_render COMMAND oled_render_host_test)
 # The captured-request parity test is intentionally absent from this
 # repository. It replays a corpus of USB captures that is not published here.
 # `protocol_unit` above still exercises the protocol builders and parsers

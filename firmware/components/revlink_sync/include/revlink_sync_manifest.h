@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "revlink_sync_presence.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,6 +32,7 @@ typedef struct {
     uint64_t initial_sync_utc;
     uint8_t sha256[REVLINK_SYNC_SHA256_BYTES];
     char cache_name[REVLINK_SYNC_CACHE_NAME_CAPACITY];
+    revlink_sync_presence_t presence;
 } revlink_sync_manifest_entry_t;
 
 typedef struct {
@@ -87,6 +90,18 @@ revlink_sync_status_t revlink_sync_manifest_parse(
     const char *input,
     size_t input_length,
     revlink_sync_manifest_t *manifest
+);
+
+/*
+ * Records what is known about one entry's presence on the device. Returns
+ * false when the path is not in the manifest, which is not an error: a device
+ * listing mentions files that were never cached.
+ */
+bool revlink_sync_manifest_set_presence(
+    revlink_sync_manifest_t *manifest,
+    const uint8_t *path,
+    size_t path_length,
+    revlink_sync_presence_t presence
 );
 
 const char *revlink_sync_status_name(revlink_sync_status_t status);

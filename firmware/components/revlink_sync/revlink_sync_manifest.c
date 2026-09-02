@@ -7,10 +7,13 @@
 
 #define REVLINK_SYNC_MANIFEST_HEADER_V1 "REVLINK-MANIFEST\t1\n"
 #define REVLINK_SYNC_MANIFEST_HEADER_V2 "REVLINK-MANIFEST\t2\n"
+#define REVLINK_SYNC_MANIFEST_HEADER_V3 "REVLINK-MANIFEST\t3\n"
 #define REVLINK_SYNC_MANIFEST_HEADER_V1_LENGTH \
     (sizeof(REVLINK_SYNC_MANIFEST_HEADER_V1) - 1U)
 #define REVLINK_SYNC_MANIFEST_HEADER_V2_LENGTH \
     (sizeof(REVLINK_SYNC_MANIFEST_HEADER_V2) - 1U)
+#define REVLINK_SYNC_MANIFEST_HEADER_V3_LENGTH \
+    (sizeof(REVLINK_SYNC_MANIFEST_HEADER_V3) - 1U)
 
 static bool valid_path_bytes(const uint8_t *value, size_t length)
 {
@@ -233,6 +236,15 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
         ) == 0;
     const uint64_t preserved_initial_sync =
         same_version ? entry->initial_sync_utc : initial_sync_utc;
+    /*
+     * An upsert is a statement about content, not about the device. It runs
+     * on the path that has just read the file *from* the AccessPort, so the
+     * file was plainly there; carrying the previous value through — or
+     * recording ON_DEVICE for a fresh entry — keeps a download from resetting
+     * what a listing established moments earlier.
+     */
+    const revlink_sync_presence_t preserved_presence =
+        had_entry ? entry->presence : REVLINK_SYNC_PRESENCE_UNKNOWN;
     memset(entry, 0, sizeof(*entry));
     memcpy(entry->path, path, path_length);
     entry->path[path_length] = '\0';
@@ -241,7 +253,42 @@ revlink_sync_status_t revlink_sync_manifest_upsert_at(
     entry->initial_sync_utc = preserved_initial_sync;
     memcpy(entry->sha256, sha256, REVLINK_SYNC_SHA256_BYTES);
     memcpy(entry->cache_name, cache_name, strlen(cache_name) + 1U);
+    entry->presence = preserved_presence;
     return REVLINK_SYNC_OK;
+}
+
+bool revlink_sync_manifest_set_presence(
+    revlink_sync_manifest_t *manifest,
+    const uint8_t *path,
+    size_t path_length,
+    revlink_sync_presence_t presence
+)
+{
+    if (manifest == NULL || !valid_path_bytes(path, path_length)) {
+        return false;
+    }
+    for (size_t index = 0U; index < manifest->count; ++index) {
+        revlink_sync_manifest_entry_t *entry = &manifest->entries[index];
+        if (strlen(entry->path) == path_length
+            && memcmp(entry->path, path, path_length) == 0) {
+            entry->presence = presence;
+            return true;
+        }
+    }
+    return false;
+}
+
+const char *revlink_sync_presence_name(revlink_sync_presence_t presence)
+{
+    switch (presence) {
+    case REVLINK_SYNC_PRESENCE_ON_DEVICE:
+        return "on-device";
+    case REVLINK_SYNC_PRESENCE_ABSENT:
+        return "absent";
+    case REVLINK_SYNC_PRESENCE_UNKNOWN:
+    default:
+        return "unknown";
+    }
 }
 
 revlink_sync_status_t revlink_sync_manifest_serialize(
@@ -270,8 +317,8 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
     } while (0)
 
     APPEND_BYTES(
-        REVLINK_SYNC_MANIFEST_HEADER_V2,
-        REVLINK_SYNC_MANIFEST_HEADER_V2_LENGTH
+        REVLINK_SYNC_MANIFEST_HEADER_V3,
+        REVLINK_SYNC_MANIFEST_HEADER_V3_LENGTH
     );
     for (size_t index = 0U; index < manifest->count; ++index) {
         const revlink_sync_manifest_entry_t *entry =
@@ -306,6 +353,13 @@ revlink_sync_status_t revlink_sync_manifest_serialize(
         APPEND_BYTES(digest_text, sizeof(digest_text));
         APPEND_BYTES("\t", 1U);
         APPEND_BYTES(entry->cache_name, strlen(entry->cache_name));
+        APPEND_BYTES("\t", 1U);
+        APPEND_BYTES(
+            entry->presence == REVLINK_SYNC_PRESENCE_ON_DEVICE
+                ? "1"
+                : entry->presence == REVLINK_SYNC_PRESENCE_ABSENT ? "2" : "0",
+            1U
+        );
         APPEND_BYTES("\n", 1U);
     }
 #undef APPEND_BYTES
@@ -323,9 +377,26 @@ revlink_sync_status_t revlink_sync_manifest_parse(
     if (input == NULL || manifest == NULL) {
         return REVLINK_SYNC_INVALID_FORMAT;
     }
+    /*
+     * v3 adds a presence column. v1 and v2 still load, and their entries come
+     * back as UNKNOWN — which is exactly what they are: those files were
+     * catalogued before anything recorded whether a listing had seen them.
+     */
+    unsigned int version = 0U;
     bool version_two = false;
     size_t header_length = 0U;
     if (
+        input_length >= REVLINK_SYNC_MANIFEST_HEADER_V3_LENGTH
+        && memcmp(
+            input,
+            REVLINK_SYNC_MANIFEST_HEADER_V3,
+            REVLINK_SYNC_MANIFEST_HEADER_V3_LENGTH
+        ) == 0
+    ) {
+        version = 3U;
+        version_two = true;
+        header_length = REVLINK_SYNC_MANIFEST_HEADER_V3_LENGTH;
+    } else if (
         input_length >= REVLINK_SYNC_MANIFEST_HEADER_V2_LENGTH
         && memcmp(
             input,
@@ -333,6 +404,7 @@ revlink_sync_status_t revlink_sync_manifest_parse(
             REVLINK_SYNC_MANIFEST_HEADER_V2_LENGTH
         ) == 0
     ) {
+        version = 2U;
         version_two = true;
         header_length = REVLINK_SYNC_MANIFEST_HEADER_V2_LENGTH;
     } else if (
@@ -343,6 +415,7 @@ revlink_sync_status_t revlink_sync_manifest_parse(
             REVLINK_SYNC_MANIFEST_HEADER_V1_LENGTH
         ) == 0
     ) {
+        version = 1U;
         header_length = REVLINK_SYNC_MANIFEST_HEADER_V1_LENGTH;
     } else {
         return REVLINK_SYNC_INVALID_FORMAT;
@@ -373,13 +446,13 @@ revlink_sync_status_t revlink_sync_manifest_parse(
             goto done;
         }
 
-        const char *fields[6];
-        size_t lengths[6];
+        const char *fields[7];
+        size_t lengths[7];
         size_t field_count = 0U;
         size_t field_start = 0U;
         for (size_t index = 0U; index <= line_length; ++index) {
             if (index == line_length || line[index] == '\t') {
-                if (field_count >= 6U || index == field_start) {
+                if (field_count >= 7U || index == field_start) {
                     status = REVLINK_SYNC_INVALID_FORMAT;
                     goto done;
                 }
@@ -389,7 +462,8 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 field_start = index + 1U;
             }
         }
-        const size_t expected_fields = version_two ? 6U : 5U;
+        const size_t expected_fields =
+            version == 3U ? 7U : (version_two ? 6U : 5U);
         const size_t cache_field = version_two ? 5U : 4U;
         const size_t digest_field = version_two ? 4U : 3U;
         if (field_count != expected_fields
@@ -423,6 +497,27 @@ revlink_sync_status_t revlink_sync_manifest_parse(
             status = REVLINK_SYNC_INVALID_FORMAT;
             goto done;
         }
+        revlink_sync_presence_t presence = REVLINK_SYNC_PRESENCE_UNKNOWN;
+        if (version == 3U) {
+            if (lengths[6] != 1U) {
+                status = REVLINK_SYNC_INVALID_FORMAT;
+                goto done;
+            }
+            switch (fields[6][0]) {
+            case '0':
+                presence = REVLINK_SYNC_PRESENCE_UNKNOWN;
+                break;
+            case '1':
+                presence = REVLINK_SYNC_PRESENCE_ON_DEVICE;
+                break;
+            case '2':
+                presence = REVLINK_SYNC_PRESENCE_ABSENT;
+                break;
+            default:
+                status = REVLINK_SYNC_INVALID_FORMAT;
+                goto done;
+            }
+        }
         const revlink_sync_status_t upsert_status =
             revlink_sync_manifest_upsert_at(
                 parsed,
@@ -440,6 +535,12 @@ revlink_sync_status_t revlink_sync_manifest_parse(
                 : REVLINK_SYNC_INVALID_FORMAT;
             goto done;
         }
+        (void)revlink_sync_manifest_set_presence(
+            parsed,
+            (const uint8_t *)fields[0],
+            lengths[0],
+            presence
+        );
         offset += line_length + 1U;
     }
 

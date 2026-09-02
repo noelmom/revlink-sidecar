@@ -553,6 +553,147 @@ int main(void)
     free(parsed_annotations);
     free(annotations);
 
+    /* ---- device presence ------------------------------------------- */
+    /*
+     * The portal has to be able to say "the Sidecar still has this, the
+     * AccessPort does not" without ever saying it on a guess. These cover the
+     * three states and, more importantly, the transitions that must NOT
+     * happen: an old manifest must not read as a claim, and a download must
+     * not erase what a listing established.
+     */
+    revlink_sync_manifest_t *presence = calloc(1U, sizeof(*presence));
+    require_true(presence != NULL, "presence manifest allocation");
+    revlink_sync_manifest_init(presence);
+    uint8_t presence_digest[REVLINK_SYNC_SHA256_BYTES];
+    fill_digest(presence_digest, 0x40U);
+    require_true(
+        revlink_sync_manifest_upsert(
+            presence,
+            (const uint8_t *)"maps/Stage1.ptm",
+            15U,
+            4242U,
+            2048U,
+            presence_digest,
+            "stage1.ptm"
+        ) == REVLINK_SYNC_OK
+            && presence->entries[0].presence
+                == REVLINK_SYNC_PRESENCE_UNKNOWN,
+        "a new entry claims nothing about the device"
+    );
+    require_true(
+        revlink_sync_manifest_set_presence(
+            presence,
+            (const uint8_t *)"maps/Stage1.ptm",
+            15U,
+            REVLINK_SYNC_PRESENCE_ON_DEVICE
+        )
+            && presence->entries[0].presence
+                == REVLINK_SYNC_PRESENCE_ON_DEVICE,
+        "a listing can record that the device has the file"
+    );
+    require_true(
+        !revlink_sync_manifest_set_presence(
+            presence,
+            (const uint8_t *)"maps/NeverCached.ptm",
+            20U,
+            REVLINK_SYNC_PRESENCE_ON_DEVICE
+        ),
+        "a device file that was never cached is not invented"
+    );
+    /*
+     * Re-reading the file must not reset what the listing recorded. This is
+     * the ordering that bit in practice: the listing runs first, the download
+     * upserts afterwards, and a memset in the upsert would have quietly
+     * cleared every presence flag on every sync.
+     */
+    require_true(
+        revlink_sync_manifest_upsert(
+            presence,
+            (const uint8_t *)"maps/Stage1.ptm",
+            15U,
+            4242U,
+            2048U,
+            presence_digest,
+            "stage1.ptm"
+        ) == REVLINK_SYNC_OK
+            && presence->entries[0].presence
+                == REVLINK_SYNC_PRESENCE_ON_DEVICE,
+        "re-syncing a file does not discard its presence"
+    );
+    require_true(
+        revlink_sync_manifest_set_presence(
+            presence,
+            (const uint8_t *)"maps/Stage1.ptm",
+            15U,
+            REVLINK_SYNC_PRESENCE_ABSENT
+        )
+            && presence->entries[0].presence == REVLINK_SYNC_PRESENCE_ABSENT,
+        "a delete can record that the device no longer has the file"
+    );
+
+    char *presence_text = malloc(65536U);
+    require_true(presence_text != NULL, "presence buffer allocation");
+    size_t presence_length = 0U;
+    require_true(
+        revlink_sync_manifest_serialize(
+            presence,
+            presence_text,
+            65536U,
+            &presence_length
+        ) == REVLINK_SYNC_OK,
+        "presence manifest serializes"
+    );
+    revlink_sync_manifest_t *reloaded = calloc(1U, sizeof(*reloaded));
+    require_true(reloaded != NULL, "reload allocation");
+    require_true(
+        revlink_sync_manifest_parse(
+            presence_text,
+            presence_length,
+            reloaded
+        ) == REVLINK_SYNC_OK
+            && reloaded->count == 1U
+            && reloaded->entries[0].presence == REVLINK_SYNC_PRESENCE_ABSENT,
+        "presence survives a save and reload"
+    );
+
+    /*
+     * A manifest written before this column existed must load as UNKNOWN.
+     * Reading it as "on device" would keep offering a delete that fails;
+     * reading it as "absent" would tell the owner their files are gone.
+     */
+    static const char legacy_v2_manifest[] =
+        "REVLINK-MANIFEST\t2\n"
+        "maps/Old.ptm\t7\t11\t0\t"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "\told.ptm\n";
+    require_true(
+        revlink_sync_manifest_parse(
+            legacy_v2_manifest,
+            sizeof(legacy_v2_manifest) - 1U,
+            reloaded
+        ) == REVLINK_SYNC_OK
+            && reloaded->count == 1U
+            && reloaded->entries[0].presence
+                == REVLINK_SYNC_PRESENCE_UNKNOWN,
+        "a v2 manifest loads as no-evidence, not as a claim"
+    );
+    static const char bad_presence[] =
+        "REVLINK-MANIFEST\t3\n"
+        "maps/Old.ptm\t7\t11\t0\t"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+        "\told.ptm\t9\n";
+    require_true(
+        revlink_sync_manifest_parse(
+            bad_presence,
+            sizeof(bad_presence) - 1U,
+            reloaded
+        ) == REVLINK_SYNC_INVALID_FORMAT,
+        "an unrecognised presence value is refused, not guessed at"
+    );
+    free(reloaded);
+    free(presence_text);
+    free(presence);
+
     puts("sync manifest tests PASSED");
     return 0;
 }

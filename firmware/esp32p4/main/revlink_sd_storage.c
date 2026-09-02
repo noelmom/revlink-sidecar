@@ -119,6 +119,24 @@ static char startup_profile_name[REVLINK_SD_STARTUP_PROFILE_NAME_CAPACITY];
 static char startup_profile_key[REVLINK_SD_DEVICE_KEY_CAPACITY];
 static char startup_profile_temp[REVLINK_SD_DOWNLOAD_PATH_CAPACITY];
 
+/*
+ * One device-listing pass. Paths are buffered as a packed run of NUL
+ * terminated strings rather than applied on arrival: the listing precedes the
+ * downloads it triggers, so a file seen for the first time on this sync has
+ * no manifest entry yet when it is observed.
+ *
+ * The pool is deliberately finite, and running out of it is treated as
+ * failure of the whole pass rather than as a shorter listing. Truncating the
+ * evidence and then acting on it is how a partial listing turns into a false
+ * claim that the owner's files are gone.
+ */
+#define REVLINK_SD_DEVICE_SCAN_POOL_BYTES 16384U
+
+static char *device_scan_pool;
+static size_t device_scan_used;
+static bool device_scan_active;
+static bool device_scan_overflowed;
+
 void revlink_sd_storage_configure_time_source(
     void *context,
     revlink_sd_trusted_time_t trusted_time
@@ -239,6 +257,7 @@ static void publish_portal_snapshot(void)
                 source->sha256,
                 sizeof(target->sha256)
             );
+            target->presence = source->presence;
         }
     }
     xSemaphoreGive(portal_snapshot_mutex);
@@ -1816,6 +1835,141 @@ static esp_err_t save_sync_manifest(
     }
     unlink(storage_device.manifest_backup_path);
     return ESP_OK;
+}
+
+/*
+ * True when this exact path was reported by the listing pass in progress.
+ * Linear over a packed string pool: at most a few hundred short paths against
+ * at most 128 manifest entries, once per sync.
+ */
+static bool device_scan_saw(const char *path)
+{
+    if (device_scan_pool == NULL || path == NULL) {
+        return false;
+    }
+    size_t offset = 0U;
+    while (offset < device_scan_used) {
+        const char *candidate = device_scan_pool + offset;
+        const size_t length = strlen(candidate);
+        if (strcmp(candidate, path) == 0) {
+            return true;
+        }
+        offset += length + 1U;
+    }
+    return false;
+}
+
+static void device_scan_release(void)
+{
+    free(device_scan_pool);
+    device_scan_pool = NULL;
+    device_scan_used = 0U;
+    device_scan_active = false;
+    device_scan_overflowed = false;
+}
+
+void revlink_sd_device_scan_begin(void *context)
+{
+    (void)context;
+    device_scan_release();
+    device_scan_pool = malloc(REVLINK_SD_DEVICE_SCAN_POOL_BYTES);
+    if (device_scan_pool == NULL) {
+        /*
+         * Without a buffer there is no evidence to gather, so the pass never
+         * opens and end() will leave every presence flag as it found it.
+         */
+        ESP_LOGW(TAG, "Device listing pass skipped: no memory for the path pool");
+        return;
+    }
+    device_scan_active = true;
+}
+
+void revlink_sd_device_scan_observe(
+    void *context,
+    const uint8_t *path,
+    size_t path_length
+)
+{
+    (void)context;
+    if (!device_scan_active || path == NULL || path_length == 0U) {
+        return;
+    }
+    if (path_length >= REVLINK_SYNC_PATH_CAPACITY
+        || path_length + 1U
+            > REVLINK_SD_DEVICE_SCAN_POOL_BYTES - device_scan_used) {
+        device_scan_overflowed = true;
+        return;
+    }
+    memcpy(device_scan_pool + device_scan_used, path, path_length);
+    device_scan_pool[device_scan_used + path_length] = '\0';
+    device_scan_used += path_length + 1U;
+}
+
+void revlink_sd_device_scan_end(void *context, bool complete)
+{
+    (void)context;
+    if (!device_scan_active) {
+        device_scan_release();
+        return;
+    }
+    if (!complete || device_scan_overflowed || !sync_manifest_ready
+        || sync_manifest == NULL) {
+        ESP_LOGI(
+            TAG,
+            "Device listing pass discarded: complete=%s overflow=%s",
+            complete ? "yes" : "no",
+            device_scan_overflowed ? "yes" : "no"
+        );
+        device_scan_release();
+        return;
+    }
+
+    size_t on_device = 0U;
+    size_t absent = 0U;
+    for (size_t index = 0U; index < sync_manifest->count; ++index) {
+        revlink_sync_manifest_entry_t *entry = &sync_manifest->entries[index];
+        if (device_scan_saw(entry->path)) {
+            entry->presence = REVLINK_SYNC_PRESENCE_ON_DEVICE;
+            ++on_device;
+        } else {
+            entry->presence = REVLINK_SYNC_PRESENCE_ABSENT;
+            ++absent;
+        }
+    }
+    const esp_err_t saved = save_sync_manifest(sync_manifest);
+    ESP_LOGI(
+        TAG,
+        "Device listing pass applied: on_device=%u absent=%u save=%s",
+        (unsigned int)on_device,
+        (unsigned int)absent,
+        esp_err_to_name(saved)
+    );
+    device_scan_release();
+    publish_portal_snapshot();
+}
+
+esp_err_t revlink_sd_mark_absent(const char *path)
+{
+    if (path == NULL || path[0] == '\0') return ESP_ERR_INVALID_ARG;
+    if (!sync_manifest_ready || sync_manifest == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const size_t length = strlen(path);
+    if (!revlink_sync_manifest_set_presence(
+            sync_manifest,
+            (const uint8_t *)path,
+            length,
+            REVLINK_SYNC_PRESENCE_ABSENT
+        )) {
+        /*
+         * Nothing cached under that path. A delete of a file the Sidecar had
+         * never synchronised is a perfectly ordinary thing to do.
+         */
+        return ESP_ERR_NOT_FOUND;
+    }
+    const esp_err_t status = save_sync_manifest(sync_manifest);
+    publish_portal_snapshot();
+    return status;
 }
 
 static esp_err_t load_sync_history(void)

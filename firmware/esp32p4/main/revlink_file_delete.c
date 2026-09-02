@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "revlink_sd_storage.h"
 
 #define REVLINK_DELETE_AUDIT_PATH \
     "/sdcard/revlink/system/acceptance/file-delete-audit.log"
@@ -92,6 +93,26 @@ static void observe_delete(
     if (event->state == REVLINK_ACCESSPORT_DELETE_REMOVED
         || event->state == REVLINK_ACCESSPORT_DELETE_FAILED) {
         append_audit(event);
+    }
+    if (event->state == REVLINK_ACCESSPORT_DELETE_REMOVED) {
+        /*
+         * The Sidecar keeps its own copy, so the row stays in the portal --
+         * correctly, because the file is still downloadable from here. What
+         * changes is that the AccessPort no longer has it, and waiting for
+         * the next sync to notice would leave the portal offering a delete
+         * that can only fail. The transport re-listed the directory and found
+         * it gone before reporting REMOVED, so this is confirmation, not an
+         * assumption.
+         */
+        const esp_err_t marked = revlink_sd_mark_absent(event->request.path);
+        if (marked != ESP_OK && marked != ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(
+                TAG,
+                "Deleted '%s' but could not record it as gone: %s",
+                event->request.path,
+                esp_err_to_name(marked)
+            );
+        }
     }
 }
 #endif

@@ -8,6 +8,7 @@
 #include "esp_err.h"
 #include "revlink_accessport_protocol.h"
 #include "revlink_sync_annotations.h"
+#include "revlink_sync_presence.h"
 
 #define REVLINK_SD_PORTAL_INVENTORY_CAPACITY \
     REVLINK_SYNC_ANNOTATION_CAPACITY
@@ -45,6 +46,7 @@ typedef struct {
     uint32_t size;
     uint64_t initial_sync_utc;
     uint8_t sha256[REVLINK_SYNC_ANNOTATION_SHA256_BYTES];
+    revlink_sync_presence_t presence;
 } revlink_sd_portal_file_t;
 
 typedef struct {
@@ -191,6 +193,37 @@ esp_err_t revlink_sd_cached_devices_snapshot(
  * namespace. The caller must ensure that no USB storage session is active.
  */
 esp_err_t revlink_sd_select_cached_device(const char *key);
+
+/*
+ * One pass of a device listing.
+ *
+ * The three calls exist rather than one because absence is only ever proved
+ * by a listing that finished. begin() opens a pass, observe() records a path
+ * the device reported, and end() applies the result only when the caller can
+ * say every collection was listed. A sync that was cancelled, failed, or was
+ * cut short by a transport error ends with complete=false and changes
+ * nothing: the previous evidence, however old, is better than a fresh guess.
+ *
+ * Observations are buffered rather than applied as they arrive because a
+ * listing runs before the downloads it triggers, so a file first seen on this
+ * sync has no manifest entry yet at the moment it is observed.
+ */
+void revlink_sd_device_scan_begin(void *context);
+
+void revlink_sd_device_scan_observe(
+    void *context,
+    const uint8_t *path,
+    size_t path_length
+);
+
+void revlink_sd_device_scan_end(void *context, bool complete);
+
+/*
+ * Records that a file is no longer on the AccessPort, without waiting for the
+ * next listing to confirm it. Used after a delete the device acknowledged and
+ * that was re-listed as gone.
+ */
+esp_err_t revlink_sd_mark_absent(const char *path);
 
 esp_err_t revlink_sd_annotations_snapshot(
     revlink_sync_annotations_t *annotations

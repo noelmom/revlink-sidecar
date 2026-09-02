@@ -2718,6 +2718,25 @@ static void run_download_acceptance(
     bool disconnect_sent = false;
     size_t candidate_count = 0U;
     size_t downloaded = 0U;
+    /*
+     * Counts collections whose listing was read and parsed, not collections
+     * whose files were all downloaded. Presence is a claim about what the
+     * device said it holds; an incremental sync that deliberately stops after
+     * a few files still learned the full contents of every directory.
+     *
+     * Declared here rather than beside the loop because cleanup is reachable
+     * by goto from well above it, and a jump past an initialiser leaves this
+     * holding whatever was on the stack — which, read as a listing count,
+     * would be a fabricated claim that every directory had been enumerated.
+     */
+    size_t listings_completed = 0U;
+    /*
+     * How many collections there are to list, filled in when the loop is
+     * reached. Zero until then, and the check below requires it to be
+     * non-zero, so a session that fails before it ever gets that far reports
+     * an incomplete listing rather than a vacuous 0 == 0 match.
+     */
+    size_t collections_expected = 0U;
     size_t skipped = 0U;
     uint32_t downloaded_bytes = 0U;
 
@@ -2870,9 +2889,17 @@ static void run_download_acceptance(
     const size_t maximum_listing_reads =
         REVLINK_DOWNLOAD_LISTING_RESPONSE_CAPACITY
             / REVLINK_ACCESSPORT_BULK_PACKET_BYTES + 2U;
+    const size_t collection_count =
+        sizeof(collections) / sizeof(collections[0]);
+    collections_expected = collection_count;
+    if (configured_download_sink.scan_begin != NULL) {
+        configured_download_sink.scan_begin(
+            configured_download_sink.context
+        );
+    }
     for (
         size_t collection_index = 0U;
-        collection_index < sizeof(collections) / sizeof(collections[0]);
+        collection_index < collection_count;
         ++collection_index
     ) {
         const revlink_read_collection_t *collection =
@@ -3052,6 +3079,8 @@ static void run_download_acceptance(
                 "READ-ONLY %s collection is empty",
                 collection->label
             );
+            /* An empty directory is a complete answer, not a missing one. */
+            ++listings_completed;
             continue;
         }
 
@@ -3075,6 +3104,24 @@ static void run_download_acceptance(
                 revlink_ap_status_name(protocol_status)
             );
             goto cleanup;
+        }
+
+        ++listings_completed;
+        if (configured_download_sink.scan_observe != NULL) {
+            /*
+             * Every entry the device reported, before the safety filter below
+             * narrows them to what this build is willing to download. The
+             * question presence answers is "did the AccessPort still list
+             * this path", and a file that became unsafe to sync is still a
+             * file that is there.
+             */
+            for (size_t index = 0U; index < entry_count; ++index) {
+                configured_download_sink.scan_observe(
+                    configured_download_sink.context,
+                    entries[index].path,
+                    entries[index].path_length
+                );
+            }
         }
 
         candidates = calloc(entry_count, sizeof(*candidates));
@@ -3292,6 +3339,14 @@ cleanup:
         .identity = *identity,
     };
     publish_event(event_monitor, &closed_event);
+    if (configured_download_sink.scan_end != NULL) {
+        configured_download_sink.scan_end(
+            configured_download_sink.context,
+            collections_expected > 0U
+                && listings_completed == collections_expected
+                && !cancelled
+        );
+    }
     configured_download_sink.release_device(
         configured_download_sink.context
     );

@@ -1011,7 +1011,7 @@ static esp_err_t portal_files_handler(httpd_req_t *request)
             REVLINK_SD_PORTAL_PATH_CAPACITY * 2U + 3U
             + REVLINK_SYNC_NOTE_CAPACITY * 2U + 3U
             + REVLINK_SYNC_ANNOTATION_SHA256_BYTES * 4U + 4U
-            + 192U
+            + 224U
         ];
     } portal_file_json_scratch_t;
     portal_file_json_scratch_t *scratch =
@@ -1104,7 +1104,7 @@ static esp_err_t portal_files_handler(httpd_req_t *request)
             ",\"deviceTimeRaw\":%" PRIu32
             ",\"initialSyncUtc\":%" PRIu64
             ",\"sha256\":\"%s\",\"note\":%s,\"noteUpdatedAt\":%" PRIu64
-            ",\"mapDigest\":%s}",
+            ",\"mapDigest\":%s,\"onDevice\":%s}",
             index == 0U ? "" : ",",
             scratch->escaped_path,
             storage->files[index].kind == REVLINK_SD_FILE_MAP
@@ -1121,7 +1121,19 @@ static esp_err_t portal_files_handler(httpd_req_t *request)
             scratch->digest,
             scratch->escaped_note,
             annotation != NULL ? annotation->updated_at_utc : 0U,
-            scratch->map_digest
+            scratch->map_digest,
+            /*
+             * Three-valued on purpose. null is not "false": it means no
+             * completed listing has spoken for this file yet, which is the
+             * honest state for anything catalogued before presence was
+             * tracked, or since the last sync was interrupted.
+             */
+            storage->files[index].presence
+                    == REVLINK_SYNC_PRESENCE_ON_DEVICE
+                ? "true"
+                : storage->files[index].presence
+                        == REVLINK_SYNC_PRESENCE_ABSENT
+                    ? "false" : "null"
         );
         if (
             entry_length <= 0
