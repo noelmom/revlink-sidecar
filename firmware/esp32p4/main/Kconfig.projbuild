@@ -378,6 +378,28 @@ config REVLINK_ALLOW_DEVICE_WRITES
         identity-pinned, and read-back-verified service also carries the exact
         images/startup_screen.fb workflow.
 
+config REVLINK_ALLOW_DEVICE_DELETES
+    bool "Permit AccessPort file deletion"
+    default n
+    depends on REVLINK_ALLOW_DEVICE_WRITES
+    help
+        Compiles the guarded delete path for files directly inside maps/ and
+        datalog/. Nothing else is deletable: not images/, not the directories
+        themselves, not anything nested.
+
+        Deletion is irreversible. The AccessPort offers no undo and RevLink
+        keeps no copy of what it removes beyond whatever the Sidecar had
+        already synchronised. Every delete pins the target device by part
+        number and serial, requires the file to be present first, and re-lists
+        the directory afterwards to confirm the entry is gone.
+
+        Owner consent for deletion is separate from write consent and is not
+        implied by it: agreeing to transfer maps onto a device is not agreeing
+        to let this remove files from it.
+
+        Leave disabled. No published image should carry this until it has been
+        accepted on real hardware.
+
 config REVLINK_MAP_AUTO_APPLY_DEFAULT
     bool "Default staged-map auto-apply preference to enabled"
     default n

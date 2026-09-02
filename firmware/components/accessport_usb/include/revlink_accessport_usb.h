@@ -91,6 +91,62 @@ typedef struct {
     uint8_t source_sha256[REVLINK_ACCESSPORT_UPLOAD_SHA256_BYTES];
 } revlink_accessport_map_upload_request_t;
 
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+typedef enum {
+    REVLINK_ACCESSPORT_DELETE_IDLE = 0,
+    REVLINK_ACCESSPORT_DELETE_RUNNING,
+    REVLINK_ACCESSPORT_DELETE_REMOVED,
+    REVLINK_ACCESSPORT_DELETE_FAILED,
+} revlink_accessport_delete_state_t;
+
+typedef struct {
+    char name[REVLINK_ACCESSPORT_UPLOAD_NAME_CAPACITY];
+    char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY];
+    /*
+     * Pinned exactly as a write is. A delete is irreversible, so the device it
+     * lands on is checked against both fields immediately before the request
+     * goes out, not merely at the time the owner asked.
+     */
+    char expected_part_number[REVLINK_AP_PART_NUMBER_CAPACITY];
+    char expected_serial[REVLINK_AP_SERIAL_CAPACITY];
+} revlink_accessport_delete_request_t;
+
+typedef struct {
+    revlink_accessport_delete_state_t state;
+    revlink_accessport_delete_request_t request;
+    bool recovery_required;
+    esp_err_t platform_error;
+} revlink_accessport_delete_event_t;
+
+typedef void (*revlink_accessport_delete_observer_t)(
+    void *context,
+    const revlink_accessport_delete_event_t *event
+);
+
+typedef struct {
+    void *context;
+    revlink_accessport_delete_observer_t observe;
+} revlink_accessport_delete_sink_t;
+
+/*
+ * Register the observer that receives every delete outcome. Without it the
+ * transport still refuses to act: a delete nobody can account for is not one
+ * this product performs.
+ */
+esp_err_t revlink_accessport_usb_configure_delete_sink(
+    const revlink_accessport_delete_sink_t *sink
+);
+
+/*
+ * Queue one delete. The transport verifies the pinned identity, confirms the
+ * target is present, sends 0x1625, requires the "15" acknowledgement, and
+ * re-lists to confirm the entry is gone before reporting success.
+ */
+esp_err_t revlink_accessport_usb_request_delete(
+    const revlink_accessport_delete_request_t *request
+);
+#endif
+
 typedef struct {
     revlink_accessport_upload_state_t state;
     revlink_accessport_map_upload_request_t request;

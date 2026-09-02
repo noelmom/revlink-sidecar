@@ -582,6 +582,42 @@ revlink_ap_status_t revlink_ap_validate_chunk(const uint8_t *chunk, size_t lengt
     return REVLINK_AP_OK;
 }
 
+bool revlink_ap_is_plain_ack_payload(
+    const uint8_t *response,
+    size_t response_length,
+    const uint8_t *expected_payload,
+    size_t expected_payload_length
+)
+{
+    /* Header is 7 bytes, then the payload, then the checksum. */
+    if (response == NULL || expected_payload == NULL
+        || expected_payload_length == 0U) {
+        return false;
+    }
+    size_t expected_length = 7U;
+    if (!checked_add(expected_length, expected_payload_length, &expected_length)
+        || !checked_add(
+               expected_length,
+               REVLINK_AP_CHECKSUM_SIZE,
+               &expected_length
+           )
+        || response_length != expected_length) {
+        return false;
+    }
+    if (response[0] != 0x02U || response[1] != 0x00U || response[2] != 0x00U
+        || response[5] != 0x00U || response[6] != 0x01U
+        || (size_t)load_u16_be(&response[3]) + 7U != response_length) {
+        return false;
+    }
+    if (memcmp(&response[7], expected_payload, expected_payload_length) != 0) {
+        return false;
+    }
+    return revlink_ap_jamcrc_zeroed_trailer(response, response_length)
+        == load_u32_be(
+            &response[response_length - REVLINK_AP_CHECKSUM_SIZE]
+        );
+}
+
 bool revlink_ap_is_plain_ack(
     const uint8_t *response,
     size_t response_length,

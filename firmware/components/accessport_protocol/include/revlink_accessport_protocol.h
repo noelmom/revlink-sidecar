@@ -231,6 +231,19 @@ bool revlink_ap_is_plain_ack(
 );
 
 /*
+ * The same class-0x01 mini acknowledgement, for the replies whose payload is
+ * more than one byte. Delete is acknowledged with the two-byte ASCII payload
+ * "15", which revlink_ap_is_plain_ack cannot express: it compares a single
+ * byte against a record of one fixed length.
+ */
+bool revlink_ap_is_plain_ack_payload(
+    const uint8_t *response,
+    size_t response_length,
+    const uint8_t *expected_payload,
+    size_t expected_payload_length
+);
+
+/*
  * Validate one complete class-0x02 plain error/NAK record whose payload is an
  * ASCII decimal error code. Returns false for malformed records, bad checksums,
  * non-error classes, or non-numeric payloads.

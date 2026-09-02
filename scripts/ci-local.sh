@@ -196,6 +196,18 @@ if [[ "$RUN_MODE" == "full" ]]; then
     -D "SDKCONFIG_DEFAULTS=$NANO_DEFAULTS" \
     set-target esp32p4 build
 
+  phase "ESP32-P4 build with file deletion compiled in"
+  # Deletion is default-off, so nothing else in CI would ever compile it.
+  DELETE_BUILD="$REPO_ROOT/build-local-ci/deletes"
+  DELETE_FRAGMENT="$REPO_ROOT/build-local-ci/deletes.defaults"
+  mkdir -p "$REPO_ROOT/build-local-ci"
+  printf 'CONFIG_REVLINK_ALLOW_DEVICE_DELETES=y\n' > "$DELETE_FRAGMENT"
+  idf.py -C firmware/esp32p4 \
+    -B "$DELETE_BUILD" \
+    -D "SDKCONFIG=$DELETE_BUILD/sdkconfig" \
+    -D "SDKCONFIG_DEFAULTS=$NANO_DEFAULTS;$DELETE_FRAGMENT" \
+    set-target esp32p4 build
+
   phase "ESP32-P4 build with device writes disabled"
   NOWRITE_BUILD="$REPO_ROOT/build-local-ci/nowrites"
   # Keep the fragment outside the build directory: set-target runs fullclean,

@@ -55,8 +55,10 @@ on your PATH:
 ./scripts/ci-local.sh --full
 ```
 
-Both configurations must build. It is easy to add code that compiles only
-when writes are enabled, and the `--full` run is what catches it.
+All three configurations must build: writes enabled, writes compiled out, and
+file deletion compiled in. It is easy to add code that compiles only under one
+of them, and the `--full` run is what catches it — deletion especially, since
+it is default-off and nothing else would ever compile it.
 
 ## Firmware builds
 

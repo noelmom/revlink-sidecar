@@ -200,6 +200,101 @@ static void test_builder_rejects_bad_arguments(void)
     );
 }
 
+/* Build a class-0x01 mini acknowledgement carrying an arbitrary payload. */
+static size_t build_mini_ack(
+    uint8_t *out,
+    const char *payload
+)
+{
+    const size_t payload_length = strlen(payload);
+    const size_t length = 7U + payload_length + 4U;
+    memset(out, 0, length);
+    out[0] = 0x02U;
+    out[3] = (uint8_t)(((length - 7U) >> 8) & 0xFFu);
+    out[4] = (uint8_t)((length - 7U) & 0xFFu);
+    out[6] = 0x01U;
+    memcpy(&out[7], payload, payload_length);
+    const uint32_t crc = revlink_ap_jamcrc_zeroed_trailer(out, length);
+    out[length - 4U] = (uint8_t)((crc >> 24) & 0xFFu);
+    out[length - 3U] = (uint8_t)((crc >> 16) & 0xFFu);
+    out[length - 2U] = (uint8_t)((crc >> 8) & 0xFFu);
+    out[length - 1U] = (uint8_t)(crc & 0xFFu);
+    return length;
+}
+
+static void test_delete_ack_is_accepted(void)
+{
+    uint8_t ack[32];
+    const size_t length = build_mini_ack(ack, "15");
+    CHECK(
+        revlink_ap_is_plain_ack_payload(
+            ack, length, (const uint8_t *)"15", 2U
+        ),
+        "the captured delete acknowledgement payload \"15\" is accepted"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(
+            ack, length, (const uint8_t *)"26", 2U
+        ),
+        "a different two-byte payload is refused"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack(ack, length, 0x15U),
+        "the single-byte helper must not accept a two-byte payload"
+    );
+
+    /* A corrupted checksum must fail even with the right payload. */
+    ack[length - 1U] ^= 0xFFu;
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(
+            ack, length, (const uint8_t *)"15", 2U
+        ),
+        "a bad checksum is refused"
+    );
+}
+
+static void test_delete_ack_rejects_malformed(void)
+{
+    uint8_t ack[32];
+    const size_t length = build_mini_ack(ack, "15");
+
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(
+            ack, length - 1U, (const uint8_t *)"15", 2U
+        ),
+        "a truncated record is refused"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(
+            ack, length, (const uint8_t *)"1", 1U
+        ),
+        "a payload length that disagrees with the record is refused"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(NULL, length, (const uint8_t *)"15", 2U),
+        "a NULL record is refused"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(ack, length, NULL, 2U),
+        "a NULL expected payload is refused"
+    );
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(ack, length, (const uint8_t *)"", 0U),
+        "an empty expected payload is refused"
+    );
+
+    /* Wrong class byte, right payload. */
+    uint8_t wrong_class[32];
+    const size_t wrong_length = build_mini_ack(wrong_class, "15");
+    wrong_class[6] = 0x02U;
+    CHECK(
+        !revlink_ap_is_plain_ack_payload(
+            wrong_class, wrong_length, (const uint8_t *)"15", 2U
+        ),
+        "a non class-0x01 record is refused"
+    );
+}
+
 int main(void)
 {
     test_permitted_targets();
@@ -210,6 +305,8 @@ int main(void)
     test_embedded_nul_is_refused();
     test_delete_record_matches_a_download_body();
     test_builder_rejects_bad_arguments();
+    test_delete_ack_is_accepted();
+    test_delete_ack_rejects_malformed();
 
     if (failures == 0U) {
         printf("delete target host test PASSED (%u checks)\n", checks);

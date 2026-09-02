@@ -85,6 +85,8 @@
 #define REVLINK_UPLOAD_TOTAL_DEADLINE_US 120000000LL
 #define REVLINK_UPLOAD_READY_ACK 0x07U
 #define REVLINK_UPLOAD_COMPLETE_ACK 0x23U
+/* Delete is acknowledged with a two-byte ASCII payload, not a subtype. */
+#define REVLINK_DELETE_ACK_PAYLOAD "15"
 #endif
 
 static const char *TAG = "revlink_usb";
@@ -101,6 +103,9 @@ typedef enum {
     DESCRIPTOR_WORK_SYNC,
     DESCRIPTOR_WORK_CLOSE_RECOVERY,
     DESCRIPTOR_WORK_MAP_UPLOAD,
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+    DESCRIPTOR_WORK_DELETE,
+#endif
 } descriptor_work_kind_t;
 
 typedef enum {
@@ -109,12 +114,18 @@ typedef enum {
     CONTROL_REQUEST_CLOSE_RECOVERY,
     CONTROL_CANCEL_SYNC,
     CONTROL_REQUEST_MAP_UPLOAD,
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+    CONTROL_REQUEST_DELETE,
+#endif
 } control_request_kind_t;
 
 typedef struct {
     control_request_kind_t kind;
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
     revlink_accessport_map_upload_request_t upload;
+#endif
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+    revlink_accessport_delete_request_t remove;
 #endif
 } usb_control_request_t;
 
@@ -140,6 +151,9 @@ typedef struct {
     uint32_t attachment_generation;
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
     revlink_accessport_map_upload_request_t upload;
+#endif
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+    revlink_accessport_delete_request_t remove;
 #endif
 } descriptor_work_t;
 
@@ -2144,6 +2158,459 @@ cleanup:
 }
 #endif
 
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+static revlink_accessport_delete_sink_t configured_delete_sink;
+static bool delete_sink_configured;
+
+esp_err_t revlink_accessport_usb_configure_delete_sink(
+    const revlink_accessport_delete_sink_t *sink
+)
+{
+    if (sink == NULL || sink->observe == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    configured_delete_sink = *sink;
+    delete_sink_configured = true;
+    return ESP_OK;
+}
+
+static void delete_observe(
+    const revlink_accessport_delete_request_t *request,
+    revlink_accessport_delete_state_t state,
+    esp_err_t platform_error,
+    bool recovery_required
+)
+{
+    if (!delete_sink_configured || configured_delete_sink.observe == NULL) {
+        return;
+    }
+    const revlink_accessport_delete_event_t event = {
+        .state = state,
+        .request = *request,
+        .recovery_required = recovery_required,
+        .platform_error = platform_error,
+    };
+    configured_delete_sink.observe(configured_delete_sink.context, &event);
+}
+
+typedef enum {
+    LISTING_QUERY_FAILED = 0,
+    LISTING_ENTRY_PRESENT,
+    LISTING_ENTRY_ABSENT,
+} listing_query_t;
+
+/*
+ * Ask the device to list one directory and report whether it holds `path`.
+ *
+ * Distinguishes "the query failed" from "the entry is not there", which
+ * map_destination_absent() deliberately does not need to: a write only cares
+ * that the destination is free, while a delete has to refuse both a missing
+ * target and an unanswered question.
+ */
+static listing_query_t directory_entry_state(
+    usb_transfer_t *out_transfer,
+    usb_transfer_t *in_transfer,
+    usb_device_handle_t device,
+    bounded_transfer_wait_t *wait,
+    const uint8_t *directory,
+    size_t directory_length,
+    const char *path
+)
+{
+    uint8_t request[REVLINK_DOWNLOAD_REQUEST_CAPACITY];
+    size_t request_length = 0U;
+    if (revlink_ap_build_list(
+            directory,
+            directory_length,
+            request,
+            sizeof(request),
+            &request_length
+        ) != REVLINK_AP_OK
+        || !acceptance_out(
+               out_transfer,
+               device,
+               wait,
+               request,
+               request_length
+           )) {
+        return LISTING_QUERY_FAILED;
+    }
+
+    uint8_t *response = malloc(REVLINK_DOWNLOAD_LISTING_RESPONSE_CAPACITY);
+    if (response == NULL) {
+        return LISTING_QUERY_FAILED;
+    }
+    size_t response_length = 0U;
+    if (!read_archive_record(
+            in_transfer,
+            device,
+            wait,
+            response,
+            REVLINK_DOWNLOAD_LISTING_RESPONSE_CAPACITY,
+            &response_length
+        )) {
+        free(response);
+        return LISTING_QUERY_FAILED;
+    }
+
+    revlink_ap_record_view_t record = {0};
+    size_t entry_count = 0U;
+    if (revlink_ap_parse_record(response, response_length, &record)
+            != REVLINK_AP_OK
+        || record.opcode != REVLINK_AP_OPCODE_RESPONSE) {
+        free(response);
+        return LISTING_QUERY_FAILED;
+    }
+    const revlink_ap_status_t sized = revlink_ap_parse_listing_payload(
+        record.payload,
+        record.payload_length,
+        NULL,
+        0U,
+        &entry_count
+    );
+    if ((sized != REVLINK_AP_OK && sized != REVLINK_AP_BUFFER_TOO_SMALL)
+        || entry_count > REVLINK_DOWNLOAD_LISTING_ENTRY_CAPACITY) {
+        free(response);
+        return LISTING_QUERY_FAILED;
+    }
+    revlink_ap_listing_entry_t *entries =
+        entry_count > 0U ? calloc(entry_count, sizeof(*entries)) : NULL;
+    if (entry_count > 0U && entries == NULL) {
+        free(response);
+        return LISTING_QUERY_FAILED;
+    }
+    if (entry_count > 0U
+        && revlink_ap_parse_listing_payload(
+               record.payload,
+               record.payload_length,
+               entries,
+               entry_count,
+               &entry_count
+           ) != REVLINK_AP_OK) {
+        free(entries);
+        free(response);
+        return LISTING_QUERY_FAILED;
+    }
+
+    listing_query_t result = LISTING_ENTRY_ABSENT;
+    const size_t path_length = strlen(path);
+    for (size_t index = 0U; index < entry_count; ++index) {
+        bool same_path = entries[index].path_length == path_length;
+        for (size_t offset = 0U; same_path && offset < path_length; ++offset) {
+            uint8_t device_value = entries[index].path[offset];
+            uint8_t requested_value = (uint8_t)path[offset];
+            if (device_value >= 'A' && device_value <= 'Z') {
+                device_value = (uint8_t)(device_value + ('a' - 'A'));
+            }
+            if (requested_value >= 'A' && requested_value <= 'Z') {
+                requested_value = (uint8_t)(requested_value + ('a' - 'A'));
+            }
+            same_path = device_value == requested_value;
+        }
+        if (same_path) {
+            result = LISTING_ENTRY_PRESENT;
+            break;
+        }
+    }
+    free(entries);
+    free(response);
+    return result;
+}
+
+/* The directory a delete target lives in, derived from its own path. */
+static bool delete_target_directory(
+    const char *path,
+    const uint8_t **directory,
+    size_t *directory_length
+)
+{
+    static const uint8_t maps_directory[] = "maps";
+    static const uint8_t datalog_directory[] = "datalog";
+    if (strncmp(path, "maps/", 5U) == 0) {
+        *directory = maps_directory;
+        *directory_length = sizeof(maps_directory) - 1U;
+        return true;
+    }
+    if (strncmp(path, "datalog/", 8U) == 0) {
+        *directory = datalog_directory;
+        *directory_length = sizeof(datalog_directory) - 1U;
+        return true;
+    }
+    return false;
+}
+
+static void run_file_delete(
+    usb_host_client_handle_t client,
+    usb_device_handle_t device,
+    accessport_usb_monitor_t *event_monitor,
+    const revlink_device_identity_t *identity,
+    bool *polite_disconnect_sent,
+    const revlink_accessport_delete_request_t *request
+)
+{
+    esp_err_t final_error = ESP_FAIL;
+    bool interface_claimed = false;
+    bool delete_sent = false;
+    bool disconnect_sent = false;
+    bool disconnect_acknowledged = false;
+    SemaphoreHandle_t completion = NULL;
+    usb_transfer_t *out_transfer = NULL;
+    usb_transfer_t *in_transfer = NULL;
+    bounded_transfer_wait_t wait = {0};
+    revlink_ap_device_info_t true_identity = {0};
+    const uint8_t *directory = NULL;
+    size_t directory_length = 0U;
+
+    delete_observe(
+        request,
+        REVLINK_ACCESSPORT_DELETE_RUNNING,
+        ESP_OK,
+        false
+    );
+
+    if (!delete_sink_configured
+        || atomic_load(&write_recovery_required)) {
+        final_error = ESP_ERR_INVALID_STATE;
+        goto cleanup;
+    }
+
+    const size_t name_length = strnlen(request->name, sizeof(request->name));
+    const size_t path_length = strnlen(request->path, sizeof(request->path));
+    if (name_length == 0U || name_length >= sizeof(request->name)
+        || path_length == 0U || path_length >= sizeof(request->path)
+        || revlink_ap_validate_delete_target(
+               (const uint8_t *)request->path,
+               path_length
+           ) != REVLINK_AP_OK
+        || !delete_target_directory(
+               request->path,
+               &directory,
+               &directory_length
+           )) {
+        final_error = ESP_ERR_INVALID_ARG;
+        goto cleanup;
+    }
+
+    final_error = usb_host_interface_claim(
+        client,
+        device,
+        REVLINK_ACCESSPORT_INTERFACE,
+        0
+    );
+    if (final_error != ESP_OK) {
+        goto cleanup;
+    }
+    interface_claimed = true;
+    const revlink_device_event_t opened_event = {
+        .kind = REVLINK_DEVICE_EVENT_SESSION_OPENED,
+        .identity = *identity,
+    };
+    publish_event(event_monitor, &opened_event);
+
+    completion = xSemaphoreCreateBinary();
+    wait.completion = completion;
+    if (completion == NULL
+        || usb_host_transfer_alloc(
+               REVLINK_DOWNLOAD_REQUEST_CAPACITY,
+               0,
+               &out_transfer
+           ) != ESP_OK
+        || usb_host_transfer_alloc(
+               REVLINK_DOWNLOAD_TRANSFER_CAPACITY,
+               0,
+               &in_transfer
+           ) != ESP_OK) {
+        final_error = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    /*
+     * Re-read identity from the device itself and require both fields to match
+     * what the owner authorised. The dataset selected in the portal is not
+     * evidence about what is plugged in now.
+     */
+    if (!read_true_device_identity(
+            out_transfer,
+            in_transfer,
+            device,
+            &wait,
+            &true_identity
+        )
+        || strcmp(
+               true_identity.part_number,
+               request->expected_part_number
+           ) != 0
+        || strcmp(true_identity.serial, request->expected_serial) != 0) {
+        final_error = ESP_ERR_INVALID_STATE;
+        goto cleanup;
+    }
+    revlink_accessport_catalog_entry_t catalog = {0};
+    if (!revlink_accessport_catalog_lookup(
+            true_identity.part_number,
+            &catalog
+        )
+        || !catalog.read_only_file_sync_supported) {
+        final_error = ESP_ERR_NOT_SUPPORTED;
+        goto cleanup;
+    }
+
+    /*
+     * The target must be there before we ask for it to go. A delete aimed at
+     * something already absent means the caller's view of the device is stale,
+     * and acting on a stale view is exactly how the wrong file disappears.
+     */
+    if (directory_entry_state(
+            out_transfer,
+            in_transfer,
+            device,
+            &wait,
+            directory,
+            directory_length,
+            request->path
+        ) != LISTING_ENTRY_PRESENT) {
+        final_error = ESP_ERR_NOT_FOUND;
+        goto cleanup;
+    }
+
+    uint8_t record[REVLINK_DOWNLOAD_REQUEST_CAPACITY];
+    size_t record_length = 0U;
+    if (revlink_ap_build_delete(
+            (const uint8_t *)request->name,
+            name_length,
+            (const uint8_t *)request->path,
+            path_length,
+            record,
+            sizeof(record),
+            &record_length
+        ) != REVLINK_AP_OK) {
+        final_error = ESP_ERR_INVALID_ARG;
+        goto cleanup;
+    }
+
+    delete_sent = true;
+    if (!acceptance_out(out_transfer, device, &wait, record, record_length)
+        || !acceptance_in(in_transfer, device, &wait)
+        || !revlink_ap_is_plain_ack_payload(
+               in_transfer->data_buffer,
+               (size_t)wait.actual_num_bytes,
+               (const uint8_t *)REVLINK_DELETE_ACK_PAYLOAD,
+               sizeof(REVLINK_DELETE_ACK_PAYLOAD) - 1U
+           )) {
+        final_error = ESP_ERR_INVALID_RESPONSE;
+        goto cleanup;
+    }
+
+    /*
+     * Confirm from the device rather than from its acknowledgement. APManager
+     * re-lists after every delete, and a success we cannot see in a listing is
+     * not one worth reporting.
+     */
+    if (directory_entry_state(
+            out_transfer,
+            in_transfer,
+            device,
+            &wait,
+            directory,
+            directory_length,
+            request->path
+        ) != LISTING_ENTRY_ABSENT) {
+        final_error = ESP_FAIL;
+        goto cleanup;
+    }
+
+    final_error = ESP_OK;
+
+cleanup:
+    /*
+     * A delete that failed after the request went out leaves the device in a
+     * state this firmware cannot describe, so it takes the same recovery lock
+     * a failed write does.
+     */
+    if (delete_sent && final_error != ESP_OK) {
+        atomic_store(&write_recovery_required, true);
+    }
+    if (out_transfer != NULL && interface_claimed) {
+        disconnect_sent = send_polite_disconnect(
+            out_transfer,
+            in_transfer,
+            device,
+            &wait,
+            &disconnect_acknowledged
+        );
+    }
+    if (polite_disconnect_sent != NULL) {
+        *polite_disconnect_sent = disconnect_sent;
+    }
+    if (in_transfer != NULL) {
+        usb_host_transfer_free(in_transfer);
+    }
+    if (out_transfer != NULL) {
+        usb_host_transfer_free(out_transfer);
+    }
+    if (completion != NULL) {
+        vSemaphoreDelete(completion);
+    }
+    if (interface_claimed) {
+        const esp_err_t release_status = usb_host_interface_release(
+            client,
+            device,
+            REVLINK_ACCESSPORT_INTERFACE
+        );
+        if (final_error == ESP_OK && release_status != ESP_OK) {
+            final_error = release_status;
+        }
+        const revlink_device_event_t closed_event = {
+            .kind = REVLINK_DEVICE_EVENT_SESSION_CLOSED,
+            .identity = *identity,
+        };
+        publish_event(event_monitor, &closed_event);
+    }
+    if (final_error == ESP_OK) {
+        ESP_LOGW(
+            TAG,
+            "FILE DELETED: part=%s path=%s confirmed_absent=yes",
+            request->expected_part_number,
+            request->path
+        );
+    } else {
+        ESP_LOGE(
+            TAG,
+            "FILE DELETE FAILED: part=%s path=%s sent=%s error=%d",
+            request->expected_part_number,
+            request->path,
+            delete_sent ? "yes" : "no",
+            (int)final_error
+        );
+    }
+    delete_observe(
+        request,
+        final_error == ESP_OK
+            ? REVLINK_ACCESSPORT_DELETE_REMOVED
+            : REVLINK_ACCESSPORT_DELETE_FAILED,
+        final_error,
+        atomic_load(&write_recovery_required)
+    );
+}
+
+esp_err_t revlink_accessport_usb_request_delete(
+    const revlink_accessport_delete_request_t *request
+)
+{
+    if (!monitor_started || control_requests == NULL || request == NULL
+        || !delete_sink_configured
+        || atomic_load(&write_recovery_required)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const usb_control_request_t control = {
+        .kind = CONTROL_REQUEST_DELETE,
+        .remove = *request,
+    };
+    return xQueueSend(control_requests, &control, 0) == pdTRUE
+        ? ESP_OK
+        : ESP_ERR_TIMEOUT;
+}
+#endif
+
 static void run_download_acceptance(
     usb_host_client_handle_t client,
     usb_device_handle_t device,
@@ -3184,6 +3651,16 @@ static void usb_transaction_task(void *arg)
                 "generation=%" PRIu32,
                 work.attachment_generation
             );
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+            if (work.kind == DESCRIPTOR_WORK_DELETE) {
+                delete_observe(
+                    &work.remove,
+                    REVLINK_ACCESSPORT_DELETE_FAILED,
+                    ESP_ERR_INVALID_STATE,
+                    atomic_load(&write_recovery_required)
+                );
+            } else
+#endif
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
             if (work.kind == DESCRIPTOR_WORK_MAP_UPLOAD) {
                 upload_observe(
@@ -3206,6 +3683,19 @@ static void usb_transaction_task(void *arg)
             }
 #endif
         } else {
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+            if (work.kind == DESCRIPTOR_WORK_DELETE) {
+                wait_for_accessport_transaction_readiness(work.device);
+                run_file_delete(
+                    state->client,
+                    work.pinned_handle,
+                    state->monitor,
+                    &work.device->identity,
+                    &work.device->polite_disconnect_sent,
+                    &work.remove
+                );
+            } else
+#endif
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
             if (work.kind == DESCRIPTOR_WORK_MAP_UPLOAD) {
                 wait_for_accessport_transaction_readiness(work.device);
@@ -3291,6 +3781,16 @@ static void process_control_requests(enumeration_client_t *state)
         enumerated_device_t *selected = NULL;
         const size_t eligible_count = eligible_accessport_count(state);
         if (state->conflict_latched || eligible_count != 1U) {
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+            if (request.kind == CONTROL_REQUEST_DELETE) {
+                delete_observe(
+                    &request.remove,
+                    REVLINK_ACCESSPORT_DELETE_FAILED,
+                    ESP_ERR_INVALID_STATE,
+                    atomic_load(&write_recovery_required)
+                );
+            } else
+#endif
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
             if (request.kind == CONTROL_REQUEST_MAP_UPLOAD) {
                 upload_observe(
@@ -3327,6 +3827,9 @@ static void process_control_requests(enumeration_client_t *state)
             bool accepted_device_busy = false;
             if (request.kind == CONTROL_REQUEST_CLOSE_RECOVERY
                 || request.kind == CONTROL_REQUEST_SYNC
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+                || request.kind == CONTROL_REQUEST_DELETE
+#endif
                 || request.kind == CONTROL_REQUEST_MAP_UPLOAD) {
                 for (
                     size_t i = 1;
@@ -3397,12 +3900,21 @@ static void process_control_requests(enumeration_client_t *state)
             continue;
         }
 
-        if (request.kind != CONTROL_REQUEST_MAP_UPLOAD) {
+        if (request.kind != CONTROL_REQUEST_MAP_UPLOAD
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+            && request.kind != CONTROL_REQUEST_DELETE
+#endif
+        ) {
             atomic_store(&sync_cancel_requested, false);
         }
         selected->scan_in_progress = true;
         const descriptor_work_t work = {
-            .kind = request.kind == CONTROL_REQUEST_MAP_UPLOAD
+            .kind =
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+                request.kind == CONTROL_REQUEST_DELETE
+                ? DESCRIPTOR_WORK_DELETE :
+#endif
+                request.kind == CONTROL_REQUEST_MAP_UPLOAD
                 ? DESCRIPTOR_WORK_MAP_UPLOAD
                 : (request.kind == CONTROL_REQUEST_CLOSE_RECOVERY
                 ? DESCRIPTOR_WORK_CLOSE_RECOVERY
@@ -3414,6 +3926,9 @@ static void process_control_requests(enumeration_client_t *state)
             .attachment_generation = selected->attachment_generation,
 #if CONFIG_REVLINK_ALLOW_DEVICE_WRITES
             .upload = request.upload,
+#endif
+#if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
+            .remove = request.remove,
 #endif
         };
         if (xQueueSend(
@@ -3896,6 +4411,7 @@ esp_err_t revlink_accessport_usb_request_identity(void)
     return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
+
 
 esp_err_t revlink_accessport_usb_request_map_upload(
     const revlink_accessport_map_upload_request_t *request
