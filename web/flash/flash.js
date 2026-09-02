@@ -322,15 +322,26 @@ async function flash() {
     });
 
     status("Restarting the Sidecar…");
-    const restarted = await restartBoard();
+    await restartBoard();
+    /*
+     * Then release the port. Native esptool ends by closing it, and closing
+     * drops the control lines to their idle state, which resets the board on
+     * this hardware — verified on a real Nano. The page previously held the
+     * port open after writing, so that reset never happened and the Sidecar
+     * sat in the bootloader until it was unplugged.
+     *
+     * The signal pulse above resets the board on its own over a plain serial
+     * port, so it is kept, but it evidently is not enough through Web Serial.
+     * Closing is also simply correct: nothing needs the port once the write
+     * is verified.
+     */
+    await releasePort();
     status(
-      restarted
-        ? "Done. The Sidecar has restarted — look for its Wi-Fi network, or "
-          + "its OLED if one is fitted."
-        : "Done, but the board could not be restarted automatically. Unplug "
-          + "it and plug it back in to run the new firmware.",
+      "Done. The Sidecar has restarted — look for its Wi-Fi network, or its " +
+      "OLED if one is fitted.",
       "ok"
     );
+    return;
   } catch (error) {
     status(describe(error), "error");
     log(String(error?.stack || error));
@@ -398,6 +409,15 @@ async function disconnect() {
   ui.progress.hidden = true;
   ui.bar.style.width = "0%";
   ui.bar.textContent = "";
+}
+
+/* Release the port without disturbing a status message already written. */
+async function releasePort() {
+  const message = ui.status.textContent;
+  const kind = ui.status.className;
+  await disconnect();
+  ui.status.textContent = message;
+  ui.status.className = kind;
 }
 
 ui.connect.addEventListener("click", connect);

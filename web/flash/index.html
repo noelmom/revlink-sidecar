@@ -165,6 +165,12 @@
       a half-written board is not a broken one — the bootloader lives in ROM,
       so you can always retry.
     </p>
+    <p class="fine">
+      The port is released once a write finishes, so the page returns to
+      Connect. That is not an error: closing the port is part of what restarts
+      the board. If it somehow stays in the bootloader, unplug it and plug it
+      back in — the firmware is already written and verified by then.
+    </p>
   </section>
 
   <section class="panel">
