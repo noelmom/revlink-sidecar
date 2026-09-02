@@ -1,12 +1,17 @@
-name: Deploy flasher
+name: Deploy site
 
-# Publishes web/flash to GitHub Pages. Pages can only serve a repository root
-# or /docs when deploying from a branch, so the flasher is uploaded as an
-# artifact instead.
+# Publishes the landing page (web/site) at / and the flasher (web/flash) at
+# /flash/. Pages can only serve a repository root or /docs when deploying from
+# a branch, so the assembled site is uploaded as an artifact instead.
 on:
   push:
     branches: [main]
     paths:
+      # web/site was missing here while the job below happily copied it into
+      # the artifact, so a landing-page-only change assembled correctly and
+      # then never deployed. A wrong claim about the firmware sat on the live
+      # page after the commit that fixed it, with a green tick next to it.
+      - "web/site/**"
       - "web/flash/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
