@@ -45,6 +45,7 @@ set(
     revlink_credentials
     revlink_identity
     revlink_network
+    revlink_oled_render
     revlink_power
     revlink_staged_map
     revlink_status

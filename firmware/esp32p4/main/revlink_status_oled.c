@@ -15,12 +15,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "qrcode.h"
+#include "revlink_oled_render.h"
 #include "revlink_status_model.h"
 
-#define OLED_WIDTH 128
-#define OLED_HEIGHT 64
-#define OLED_PAGES (OLED_HEIGHT / 8)
-#define OLED_BUFFER_SIZE (OLED_WIDTH * OLED_PAGES)
+/* One source of truth for the panel geometry: the renderer's. */
+#define OLED_WIDTH REVLINK_OLED_WIDTH
+#define OLED_HEIGHT REVLINK_OLED_HEIGHT
+#define OLED_PAGES REVLINK_OLED_PAGES
+#define OLED_BUFFER_SIZE REVLINK_OLED_BUFFER_SIZE
 #define OLED_SPI_HOST SPI2_HOST
 #define OLED_PIN_SCLK GPIO_NUM_23
 #define OLED_PIN_MOSI GPIO_NUM_22
@@ -29,7 +31,7 @@
 #define OLED_PIN_RESET GPIO_NUM_2
 #define OLED_CLOCK_HZ (8 * 1000 * 1000)
 #define OLED_TASK_PERIOD_MS 100U
-#define OLED_SPLASH_MS 1500U
+#define OLED_SPLASH_MS REVLINK_OLED_SPLASH_MS
 #define OLED_HEADER_CYCLE_TICKS 150U
 #define OLED_SIDECAR_WINDOW_TICKS 30U
 #define OLED_CONNECTED_SSID_CAPACITY 33U
@@ -77,153 +79,50 @@ typedef struct {
     uint8_t bitmap[OLED_QR_BITMAP_SIZE];
 } hotspot_qr_render_t;
 
-typedef struct {
-    char character;
-    uint8_t columns[5];
-} glyph_t;
 
-static const glyph_t font[] = {
-    {' ', {0x00, 0x00, 0x00, 0x00, 0x00}},
-    {'-', {0x08, 0x08, 0x08, 0x08, 0x08}},
-    {'.', {0x00, 0x60, 0x60, 0x00, 0x00}},
-    {'0', {0x3e, 0x51, 0x49, 0x45, 0x3e}},
-    {'1', {0x00, 0x42, 0x7f, 0x40, 0x00}},
-    {'2', {0x42, 0x61, 0x51, 0x49, 0x46}},
-    {'3', {0x21, 0x41, 0x45, 0x4b, 0x31}},
-    {'4', {0x18, 0x14, 0x12, 0x7f, 0x10}},
-    {'5', {0x27, 0x45, 0x45, 0x45, 0x39}},
-    {'6', {0x3c, 0x4a, 0x49, 0x49, 0x30}},
-    {'7', {0x01, 0x71, 0x09, 0x05, 0x03}},
-    {'8', {0x36, 0x49, 0x49, 0x49, 0x36}},
-    {'9', {0x06, 0x49, 0x49, 0x29, 0x1e}},
-    {'A', {0x7e, 0x11, 0x11, 0x11, 0x7e}},
-    {'B', {0x7f, 0x49, 0x49, 0x49, 0x36}},
-    {'C', {0x3e, 0x41, 0x41, 0x41, 0x22}},
-    {'D', {0x7f, 0x41, 0x41, 0x22, 0x1c}},
-    {'E', {0x7f, 0x49, 0x49, 0x49, 0x41}},
-    {'F', {0x7f, 0x09, 0x09, 0x09, 0x01}},
-    {'G', {0x3e, 0x41, 0x49, 0x49, 0x7a}},
-    {'H', {0x7f, 0x08, 0x08, 0x08, 0x7f}},
-    {'I', {0x00, 0x41, 0x7f, 0x41, 0x00}},
-    {'J', {0x20, 0x40, 0x41, 0x3f, 0x01}},
-    {'K', {0x7f, 0x08, 0x14, 0x22, 0x41}},
-    {'L', {0x7f, 0x40, 0x40, 0x40, 0x40}},
-    {'M', {0x7f, 0x02, 0x0c, 0x02, 0x7f}},
-    {'N', {0x7f, 0x04, 0x08, 0x10, 0x7f}},
-    {'O', {0x3e, 0x41, 0x41, 0x41, 0x3e}},
-    {'P', {0x7f, 0x09, 0x09, 0x09, 0x06}},
-    {'Q', {0x3e, 0x41, 0x51, 0x21, 0x5e}},
-    {'R', {0x7f, 0x09, 0x19, 0x29, 0x46}},
-    {'S', {0x46, 0x49, 0x49, 0x49, 0x31}},
-    {'T', {0x01, 0x01, 0x7f, 0x01, 0x01}},
-    {'U', {0x3f, 0x40, 0x40, 0x40, 0x3f}},
-    {'V', {0x1f, 0x20, 0x40, 0x20, 0x1f}},
-    {'W', {0x3f, 0x40, 0x38, 0x40, 0x3f}},
-    {'X', {0x63, 0x14, 0x08, 0x14, 0x63}},
-    {'Y', {0x07, 0x08, 0x70, 0x08, 0x07}},
-    {'Z', {0x61, 0x51, 0x49, 0x45, 0x43}},
-    {'a', {0x20, 0x54, 0x54, 0x54, 0x78}},
-    {'b', {0x7f, 0x48, 0x44, 0x44, 0x38}},
-    {'c', {0x38, 0x44, 0x44, 0x44, 0x20}},
-    {'d', {0x38, 0x44, 0x44, 0x48, 0x7f}},
-    {'e', {0x38, 0x54, 0x54, 0x54, 0x18}},
-    {'f', {0x08, 0x7e, 0x09, 0x01, 0x02}},
-    {'g', {0x0c, 0x52, 0x52, 0x52, 0x3e}},
-    {'h', {0x7f, 0x08, 0x04, 0x04, 0x78}},
-    {'i', {0x00, 0x44, 0x7d, 0x40, 0x00}},
-    {'j', {0x20, 0x40, 0x44, 0x3d, 0x00}},
-    {'k', {0x7f, 0x10, 0x28, 0x44, 0x00}},
-    {'l', {0x00, 0x41, 0x7f, 0x40, 0x00}},
-    {'m', {0x7c, 0x04, 0x18, 0x04, 0x78}},
-    {'n', {0x7c, 0x08, 0x04, 0x04, 0x78}},
-    {'o', {0x38, 0x44, 0x44, 0x44, 0x38}},
-    {'p', {0x7c, 0x14, 0x14, 0x14, 0x08}},
-    {'q', {0x08, 0x14, 0x14, 0x18, 0x7c}},
-    {'r', {0x7c, 0x08, 0x04, 0x04, 0x08}},
-    {'s', {0x48, 0x54, 0x54, 0x54, 0x20}},
-    {'t', {0x04, 0x3f, 0x44, 0x40, 0x20}},
-    {'u', {0x3c, 0x40, 0x40, 0x20, 0x7c}},
-    {'v', {0x1c, 0x20, 0x40, 0x20, 0x1c}},
-    {'w', {0x3c, 0x40, 0x30, 0x40, 0x3c}},
-    {'x', {0x44, 0x28, 0x10, 0x28, 0x44}},
-    {'y', {0x0c, 0x50, 0x50, 0x50, 0x3c}},
-    {'z', {0x44, 0x64, 0x54, 0x4c, 0x44}},
-};
-
-static const uint8_t *glyph_columns(char character)
-{
-    for (size_t index = 0U; index < sizeof(font) / sizeof(font[0]); ++index) {
-        if (font[index].character == character) {
-            return font[index].columns;
-        }
-    }
-    return font[0].columns;
-}
-
+/*
+ * The font and the primitives that draw with it live in revlink_oled_render,
+ * where they can be rendered and inspected on a host. These bind them to this
+ * module's framebuffer so the drawing code below reads as it always has.
+ */
 static void set_pixel(int x, int y, bool enabled)
 {
-    if (x < 0 || x >= OLED_WIDTH || y < 0 || y >= OLED_HEIGHT) {
-        return;
-    }
-    const size_t offset = (size_t)x + (size_t)(y / 8) * OLED_WIDTH;
-    const uint8_t mask = (uint8_t)(1U << (unsigned int)(y & 7));
-    if (enabled) {
-        framebuffer[offset] |= mask;
-    } else {
-        framebuffer[offset] &= (uint8_t)~mask;
-    }
+    revlink_oled_set_pixel(framebuffer, x, y, enabled);
 }
 
 static void fill_rect(int x, int y, int width, int height, bool enabled)
 {
-    for (int row = y; row < y + height; ++row) {
-        for (int column = x; column < x + width; ++column) {
-            set_pixel(column, row, enabled);
-        }
-    }
+    revlink_oled_fill_rect(framebuffer, x, y, width, height, enabled);
 }
 
 static void draw_rect(int x, int y, int width, int height)
 {
-    fill_rect(x, y, width, 1, true);
-    fill_rect(x, y + height - 1, width, 1, true);
-    fill_rect(x, y, 1, height, true);
-    fill_rect(x + width - 1, y, 1, height, true);
+    revlink_oled_draw_rect(framebuffer, x, y, width, height);
 }
 
 static int text_width(const char *text, int scale)
 {
-    return text == NULL ? 0 : (int)strlen(text) * 6 * scale - scale;
+    return revlink_oled_text_width(text, scale);
 }
 
 static void draw_text(int x, int y, const char *text, int scale)
 {
-    if (text == NULL || scale < 1) {
-        return;
-    }
-    while (*text != '\0') {
-        const uint8_t *columns = glyph_columns(*text);
-        for (int column = 0; column < 5; ++column) {
-            for (int row = 0; row < 7; ++row) {
-                if ((columns[column] & (1U << row)) != 0U) {
-                    fill_rect(
-                        x + column * scale,
-                        y + row * scale,
-                        scale,
-                        scale,
-                        true
-                    );
-                }
-            }
-        }
-        x += 6 * scale;
-        ++text;
-    }
+    revlink_oled_draw_text(framebuffer, x, y, text, scale);
 }
 
 static void draw_centered(int y, const char *text, int scale)
 {
-    draw_text((OLED_WIDTH - text_width(text, scale)) / 2, y, text, scale);
+    revlink_oled_draw_centered(framebuffer, y, text, scale);
+}
+
+static void draw_splash(uint32_t elapsed_ms)
+{
+    const esp_app_desc_t *description = esp_app_get_description();
+    revlink_oled_draw_splash(
+        framebuffer,
+        elapsed_ms,
+        description != NULL ? description->version : NULL
+    );
 }
 
 static void draw_wifi_icon(int x, int y)
@@ -239,53 +138,6 @@ static void draw_wifi_icon(int x, int y)
     set_pixel(x + 5, y + 4, true);
 
     set_pixel(x + 3, y + 6, true);
-}
-
-static void draw_portal_mark(int x, int y, int phase)
-{
-    draw_rect(x, y, 17, 17);
-    draw_rect(x + 3, y + 3, 11, 11);
-    fill_rect(x + 8, y + 6, 3, 8, false);
-    fill_rect(x + 10, y + 11, 7, 3, true);
-    fill_rect(x + 13, y + 14, 4, 3, true);
-    const int scan = phase % 15;
-    fill_rect(x + 1, y + 1 + scan, 15, 1, true);
-}
-
-static void draw_splash(uint32_t elapsed_ms)
-{
-    memset(framebuffer, 0, sizeof(framebuffer));
-    const int phase = (int)(elapsed_ms / 80U);
-    draw_portal_mark(10, 18, phase);
-    draw_text(34, 20, "REVLINK", 2);
-    /*
-     * The firmware version, not a fixed greeting. Nothing can be drawn while
-     * the board is being flashed — the application is not running, the ROM
-     * bootloader is, and the panel simply holds whatever frame was left on it.
-     * The first thing it draws afterwards is therefore the only chance to show
-     * that anything changed, so make it say which build is now running.
-     */
-    const esp_app_desc_t *description = esp_app_get_description();
-    /*
-     * esp_app_desc_t::version is 32 bytes and a git-describe fallback fills
-     * most of it, so bound the copy rather than let a long version silently
-     * truncate the label in front of it.
-     */
-    char banner[40];
-    (void)snprintf(
-        banner,
-        sizeof(banner),
-        "FIRMWARE %.*s",
-        16,
-        description != NULL && description->version[0] != '\0'
-            ? description->version
-            : "UNKNOWN"
-    );
-    draw_centered(39, banner, 1);
-    fill_rect(8, 55, 112, 2, false);
-    draw_rect(8, 54, 112, 4);
-    const int width = (int)((elapsed_ms * 108U) / OLED_SPLASH_MS);
-    fill_rect(10, 55, width > 108 ? 108 : width, 2, true);
 }
 
 static void draw_status(
