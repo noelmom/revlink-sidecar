@@ -497,7 +497,18 @@ static esp_err_t validate_pending(revlink_backup_summary_t *summary)
     uint64_t data_bytes = 0U;
     char devices[BACKUP_DEVICE_CAPACITY][25U] = {{0}};
     uint32_t device_count = 0U;
-    uint8_t buffer[BACKUP_BUFFER_BYTES];
+    /*
+     * On the heap, for the same reason the export path's buffers are: this
+     * runs on the HTTP server task, whose stack had to be raised to 12 KiB
+     * after a measured 6116-byte peak overflowed 6 KiB. A 4 KiB frame here is
+     * most of what that increase bought.
+     */
+    uint8_t *buffer = malloc(BACKUP_BUFFER_BYTES);
+    if (buffer == NULL) {
+        psa_hash_abort(&archive_hash);
+        fclose(stream);
+        return ESP_ERR_NO_MEM;
+    }
     esp_err_t result = ESP_OK;
     for (uint32_t index = 0U; result == ESP_OK && index < files; ++index) {
         uint8_t entry[BACKUP_ENTRY_BYTES];
@@ -531,7 +542,8 @@ static esp_err_t validate_pending(revlink_backup_summary_t *summary)
         uint64_t remaining = size;
         while (remaining > 0U) {
             const size_t requested =
-                remaining < sizeof(buffer) ? (size_t)remaining : sizeof(buffer);
+                remaining < BACKUP_BUFFER_BYTES
+                    ? (size_t)remaining : BACKUP_BUFFER_BYTES;
             if (!read_exact(stream, buffer, requested)
                 || psa_hash_update(&file_hash, buffer, requested)
                     != PSA_SUCCESS
@@ -590,6 +602,7 @@ static esp_err_t validate_pending(revlink_backup_summary_t *summary)
         summary->created_utc = get_u64(header + 24U);
         digest_hex(archive_digest, summary->token);
     }
+    free(buffer);
     fclose(stream);
     return result;
 }
@@ -670,12 +683,23 @@ static esp_err_t ensure_parent_directories(char *path)
     return ESP_OK;
 }
 
-static esp_err_t skip_bytes(FILE *stream, uint64_t bytes)
+/*
+ * Borrows the caller's scratch buffer rather than declaring its own. Its only
+ * caller invokes it from inside a loop that already holds one, so a private
+ * buffer here — on the stack or the heap — would mean two live at once for no
+ * benefit. Passing one in makes that impossible rather than merely unlikely.
+ */
+static esp_err_t skip_bytes(
+    FILE *stream,
+    uint64_t bytes,
+    uint8_t *buffer,
+    size_t capacity
+)
 {
-    uint8_t buffer[BACKUP_BUFFER_BYTES];
+    if (buffer == NULL || capacity == 0U) return ESP_ERR_INVALID_ARG;
     while (bytes > 0U) {
         const size_t requested =
-            bytes < sizeof(buffer) ? (size_t)bytes : sizeof(buffer);
+            bytes < capacity ? (size_t)bytes : capacity;
         if (!read_exact(stream, buffer, requested)) return ESP_FAIL;
         bytes -= requested;
     }
@@ -701,7 +725,16 @@ esp_err_t revlink_backup_restore_merge(
     const uint32_t files = get_u32(global + 12U);
     memset(result, 0, sizeof(*result));
     esp_err_t status = ESP_OK;
-    uint8_t buffer[BACKUP_BUFFER_BYTES];
+    /*
+     * Heap, not stack. This loop also calls hash_file(), which allocates a
+     * transfer buffer of its own, so the peak here was two 4 KiB buffers plus
+     * whatever the walk below it needed.
+     */
+    uint8_t *buffer = malloc(BACKUP_BUFFER_BYTES);
+    if (buffer == NULL) {
+        fclose(archive);
+        return ESP_ERR_NO_MEM;
+    }
     for (uint32_t index = 0U; status == ESP_OK && index < files; ++index) {
         uint8_t entry[BACKUP_ENTRY_BYTES];
         if (!read_exact(archive, entry, sizeof(entry))) {
@@ -736,7 +769,7 @@ esp_err_t revlink_backup_restore_merge(
             } else {
                 result->conflicting_files++;
             }
-            status = skip_bytes(archive, size);
+            status = skip_bytes(archive, size, buffer, BACKUP_BUFFER_BYTES);
             continue;
         }
         if (errno != ENOENT || ensure_parent_directories(destination) != ESP_OK) {
@@ -770,7 +803,8 @@ esp_err_t revlink_backup_restore_merge(
         uint64_t remaining = size;
         while (status == ESP_OK && remaining > 0U) {
             const size_t requested =
-                remaining < sizeof(buffer) ? (size_t)remaining : sizeof(buffer);
+                remaining < BACKUP_BUFFER_BYTES
+                    ? (size_t)remaining : BACKUP_BUFFER_BYTES;
             if (!read_exact(archive, buffer, requested)
                 || fwrite(buffer, 1U, requested, output) != requested
                 || psa_hash_update(&hash, buffer, requested) != PSA_SUCCESS) {
@@ -804,6 +838,7 @@ esp_err_t revlink_backup_restore_merge(
             if (status == ESP_OK) status = ESP_FAIL;
         }
     }
+    free(buffer);
     fclose(archive);
     if (status == ESP_OK) {
         unlink(BACKUP_PENDING);
