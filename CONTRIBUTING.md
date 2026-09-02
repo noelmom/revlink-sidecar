@@ -10,6 +10,18 @@ the fail-closed behavior on ambiguous device topology are load-bearing. A PR
 that loosens one of them will be asked to justify it in detail, and most such
 PRs will be declined.
 
+## Track work as issues
+
+Open a GitHub issue before starting anything beyond a small fix, and reference
+it from the commits. Multi-layer work — protocol, transport, service, portal —
+is the normal shape here, and it is easy to land one layer and lose the rest
+in a long session. An issue is what makes the remaining layers visible.
+
+That is not bookkeeping. A partially-implemented device-facing feature is
+worse than none: the documentation describes something the UI cannot reach,
+or a capability is compiled in with only some of its gates. If you land a
+layer, say in the issue what is still missing.
+
 ## Ground rules
 
 1. **Protocol logic stays in C components, never in the browser.** The portal
