@@ -178,6 +178,13 @@ docs/               Architecture, safety model, networking, storage, bring-up
 | [MAP_WRITE_ACCEPTANCE.md](docs/MAP_WRITE_ACCEPTANCE.md) | The gated round-trip procedure for map writes |
 | [FILE_DELETE.md](docs/FILE_DELETE.md) | Removing a file from the AccessPort, and why it is gated apart from writes |
 | [ACCEPTANCE_LOG.md](docs/ACCEPTANCE_LOG.md) | Dated bench records for the ESP32-P4 target. History, not current state |
+| [FIRMWARE_UPDATE.md](docs/FIRMWARE_UPDATE.md) | How firmware gets onto the board, and why there is no OTA |
+| [POWER_MANAGEMENT.md](docs/POWER_MANAGEMENT.md) | BOOT-button behaviour, safe shutdown, and deep sleep |
+| [WIFI_BRINGUP.md](docs/WIFI_BRINGUP.md) | The ESP32-C6 radio link over SDIO, and what it took to bring up |
+| [OLED_BRINGUP.md](docs/OLED_BRINGUP.md) | SH1106 wiring and the status screens |
+| [ACCESSPORT_TIME_METADATA.md](docs/ACCESSPORT_TIME_METADATA.md) | What the AccessPort's timestamps mean, and what RevLink records instead |
+| [ESP32S3_USB_POWER_BRINGUP.md](docs/ESP32S3_USB_POWER_BRINGUP.md) | Why the ESP32-S3 was retired: full-speed USB cannot do 512-byte bulk |
+| [ESP32P4_DEMO.md](docs/ESP32P4_DEMO.md) | Runbook for demonstrating the Sidecar |
 | [OPERATIONAL_LOGGING.md](docs/OPERATIONAL_LOGGING.md) | What is logged, what is not, and the two audit logs that ship |
 | [STAGED_MAPS.md](docs/STAGED_MAPS.md) | Uploading a map with no AccessPort attached, and applying it on the next sync |
 | [PRODUCT_NETWORKING.md](docs/PRODUCT_NETWORKING.md) | Client-first Wi-Fi with fallback hotspot and captive portal |

@@ -112,11 +112,18 @@ config REVLINK_DEV_CONSOLE
     help
         Adds a fixed-command UART adapter for status, manual read-only sync,
         cooperative cancel, and saved auto-sync policy. It calls the same
-        transport-neutral revlink_control service intended for future HTTP
-        and BLE adapters.
+        transport-neutral revlink_control service that the portal's HTTP
+        adapter also uses; a BLE adapter would be a third.
 
-        The parser accepts no paths, filenames, credentials, upload, delete,
-        format, or arbitrary protocol command.
+        The parser accepts no paths, filenames, upload, delete, format, or
+        arbitrary protocol command.
+
+        It is not credential-free. With REVLINK_WIFI_JOIN_ACCEPTANCE also
+        enabled — as it is in the shipped Nano profile — the `wifi-join`
+        command reads an SSID and a password from this UART. They are read
+        with echo suppressed and zeroised after use, but anyone with physical
+        access to the programming port can set the Wi-Fi credentials. Treat
+        the port as trusted-physical-access only.
 
 config REVLINK_LOCAL_METADATA_BACKFILL_ACCEPTANCE
     bool "MAINTENANCE ONLY: repair development Initial sync timestamps"

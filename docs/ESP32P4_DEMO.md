@@ -1,7 +1,8 @@
 # RevLink Sidecar ESP32-P4 demo
 
-This is the current local-first product demonstration path. It runs entirely
-on the ESP32-P4 development board and its microSD card.
+A runbook for recording or giving a live demonstration. Everything runs on the
+Sidecar and its microSD card; nothing needs a network beyond the one the phone
+and the Sidecar share.
 
 ## Before recording
 
@@ -17,8 +18,9 @@ on the ESP32-P4 development board and its microSD card.
 5. Open `http://revlink-<last-8-mac>.local`.
 6. If mDNS is unavailable on the client, use the IPv4 address shown during
    connection setup.
-7. Keep AccessPort writes disabled unless the presentation explicitly includes
-   the rehearsed, controlled write segment. AccessPort deletion is unavailable.
+7. Writes and deletes both ship and both start locked. Leave them locked
+   unless the presentation includes a rehearsed segment for them, and say on
+   camera that they are separate consents the owner turns on.
 
 The current development board is:
 
@@ -84,7 +86,7 @@ demo address.
 - cloud backup, share links, or Sidecar-hosted email delivery;
 - embedded AI;
 - a live-accepted startup-screen write from the P4;
-- deletion from AccessPort storage; or
+- a second AccessPort arriving during a write or delete; or
 - ECU flashing or real-time tuning.
 
 ## Recovery
