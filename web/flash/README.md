@@ -70,9 +70,9 @@ carries its own separate consent key rather than riding on the write flag.
 ## Releases are immutable
 
 ```
-releases.json                    {"current": "v0.2.2-nano"}
-firmware/v0.2.2-nano/            binaries + manifest.json + SHA256SUMS
-firmware/v0.2.1-nano/            the previous one, still reachable
+releases.json                    {"current": "v0.2.6-nano"}
+firmware/v0.2.6-nano/            binaries + manifest.json + SHA256SUMS
+firmware/v0.2.5-nano/            the previous one, still reachable
 ```
 
 A published release directory is never rewritten. A version string has to name
@@ -112,7 +112,53 @@ idf.py -C firmware/esp32p4 -B "$B" \
 # 6. Run ./scripts/ci-local.sh — the manifest, version and digest assertions
 #    must pass.
 # 7. Flash a real board before announcing it.
+# 8. Open a PR and MERGE IT WITH A MERGE COMMIT, not a squash. See below.
+# 9. Tag the build commit, then cut a GitHub Release pointing at the release
+#    directory on main.
 ```
+
+### Merge the release PR, do not squash it
+
+`main` is protected, so a release goes through a pull request. Merge it with a
+**merge commit**.
+
+The binary embeds the commit it was built from — `CMakeLists.txt` resolves it
+at configure time into `REVLINK_GIT_COMMIT`, it is what the portal footer
+shows, and it is what `manifest.json` records as the provenance for those
+bytes. A squash mints a new hash and discards the one that was built, so the
+manifest ends up naming a commit that never reaches `main`. The release
+directory then cannot be traced back to anything, which is the entire property
+it exists to provide.
+
+After merging, confirm it survived:
+
+```bash
+git merge-base --is-ancestor <build-commit> main && echo ok
+```
+
+### Tag the build commit, not the publish commit
+
+```bash
+git tag -a v0.2.6 <build-commit> -m "RevLink Sidecar 0.2.6 (v0.2.6-nano)"
+git push origin v0.2.6
+```
+
+The tag names the commit whose source reproduces the published bytes. It
+deliberately does **not** contain the release directory, which is added by the
+commit after it — so a GitHub Release body must link the directory on `main`:
+
+```
+https://github.com/noelmom/revlink-sidecar/tree/main/web/flash/firmware/v0.2.6-nano
+```
+
+not at the tag, where it 404s. Release directories are immutable, so a link to
+`main` is stable forever.
+
+It is tempting to fix that by moving the tag onto the publish commit instead.
+Do not. For 0.2.2 the embedded `portal/index.html` was corrected between the
+build and the publish commit, so the publish commit does not rebuild the bytes
+that were shipped. Tagging it would trade a broken link for a false provenance
+claim, which is worse.
 
 Offsets for the current partition table:
 
