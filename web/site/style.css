@@ -104,6 +104,21 @@ a { color: var(--accent); }
 
 .shot.narrow { max-width: 34rem; }
 
+.shot.clip video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #000;
+}
+
+.shot.clip figcaption strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: .25rem;
+}
+
 /* Screenshot tour. The phone shots are tall and narrow, so they go in a grid
    that collapses to one column rather than being scaled down until the text
    inside them is unreadable. */
