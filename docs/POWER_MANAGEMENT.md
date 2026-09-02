@@ -67,6 +67,31 @@ cycle power to wake. The production board should use the same lifecycle
 sequence, but trigger it from external-power loss or a dedicated action button
 and use its physical USB link-control adapter.
 
+## Current BOOT button bindings
+
+One button, on GPIO35, labelled `BOOT` on the Waveshare board and brought out
+to the left-hand side button on the printed case. Presses count as a group when
+they land within 650 ms of each other.
+
+| Gesture | What happens |
+| --- | --- |
+| **Double-press** | Shows how to reach the portal. If the Sidecar is running its own hotspot you get a scannable Wi-Fi QR code; if it has joined a network instead, you get its `revlink-<id>.local` address. |
+| **Any press while that is showing** | Dismisses it and returns to the normal status screen. |
+| **Two double-presses within 20 s** | Authorises formatting a microSD that responded but would not mount. Deliberately awkward — see the storage recovery section. |
+| **Hold 2 s** | Safe shutdown: blocks new syncs, cancels active work cooperatively, stops the USB host, unmounts the card, then deep sleep. |
+
+Waking is `RST` or a power cycle; the hold is soft power and does not remove
+the board supply.
+
+All of the display gestures need the optional OLED fitted. Without one the
+firmware still works and the button still shuts down on a hold, but the QR and
+the address have nowhere to appear — use the address the portal shows, or
+mDNS.
+
+The double-press exists because "what is this thing's address" is the question
+every new user asks first, and answering it on the device is faster than
+explaining mDNS.
+
 ## Planned two-button controls
 
 Do not implement this behavior until the development-board button wiring has

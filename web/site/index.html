@@ -209,6 +209,26 @@ AccessPort ──USB-A host──&gt; ESP32-P4 Sidecar ──Wi-Fi──&gt; you
   </figure>
 
   <section>
+    <h2>One button, three things</h2>
+    <p>
+      There is a single button on the case, and the one worth knowing is the
+      double-press: it puts a Wi-Fi QR code on the little screen when the
+      Sidecar is running its own hotspot, so you scan it and you're on. If it
+      has joined your home or shop network instead, the same double-press shows
+      its <code>revlink-&lt;id&gt;.local</code> address rather than a QR.
+    </p>
+    <p>
+      Holding it for two seconds shuts the Sidecar down properly — it cancels
+      whatever is running, unmounts the card, and sleeps, so you can unplug it
+      without wondering whether you just corrupted something.
+    </p>
+    <p class="fine">
+      Both of those need the optional screen fitted. Without one it still runs
+      and still shuts down on a hold; there's just nowhere to draw a QR code.
+    </p>
+  </section>
+
+  <section>
     <h2>What it deliberately doesn't do</h2>
     <p>
       This reads and writes <em>files</em>. It is not a tuning tool, and it is
@@ -245,7 +265,8 @@ AccessPort ──USB-A host──&gt; ESP32-P4 Sidecar ──Wi-Fi──&gt; you
         <a href="https://amzn.to/4gxIFfp" rel="sponsored nofollow noopener">Anker Nano</a>.
       </li>
       <li>
-        Optional: a 1.3&Prime; SH1106 OLED for status at a glance —
+        Optional: a 1.3&Prime; SH1106 OLED for status at a glance, and for the
+        button trick below —
         <a href="https://amzn.to/46BiJJQ" rel="sponsored nofollow noopener">the SPI one</a>, not I2C.
       </li>
       <li>

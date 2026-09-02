@@ -62,6 +62,20 @@ This project reads and writes *files*. It is not a tuning tool.
 - **No public internet exposure.** The portal has no transport encryption and
   is meant for a trusted local network.
 
+## Using it
+
+One button does everything. On the Waveshare board it is `BOOT`; on the printed
+case it is the left side button.
+
+| Gesture | What it does |
+| --- | --- |
+| Double-press | Shows how to reach the portal — a Wi-Fi QR code when the Sidecar is running its own hotspot, or its `revlink-<id>.local` address when it has joined your network |
+| Press again | Dismisses it |
+| Hold 2 seconds | Safe shutdown: cancels work, unmounts the card, sleeps. `RST` or a power cycle wakes it |
+| Two double-presses within 20 s | Authorises formatting a card that responded but would not mount — see [POWER_MANAGEMENT.md](docs/POWER_MANAGEMENT.md) |
+
+The display gestures need the optional OLED. Everything else works without one.
+
 ## Hardware
 
 | Part | Notes |
