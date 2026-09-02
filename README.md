@@ -94,7 +94,7 @@ tried and retired — the full write-up is in
 ## Install
 
 **Easiest — flash from your browser:
-[noelmom.github.io/revlink-sidecar](https://noelmom.github.io/revlink-sidecar/)**
+[revlinkgarage.com](https://revlinkgarage.com/)**
 
 Open it in Chrome or Edge, plug the board in over USB-C, and click Flash. No
 toolchain, no command line. It reads the board's silicon revision first and refuses to write an
