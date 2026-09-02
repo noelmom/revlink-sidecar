@@ -51,6 +51,12 @@ jobs:
           mkdir -p _site/flash
           cp -r web/flash/. _site/flash/
           rm -f _site/flash/README.md _site/flash/gate.test.mjs
+          # CNAME rides along from web/site and is what binds the custom
+          # domain to this artifact. Fail loudly if it ever goes missing:
+          # without it GitHub serves the site at the github.io path and the
+          # custom domain 404s, which looks like a DNS problem and is not.
+          test -f _site/CNAME || { echo "CNAME missing from the artifact"; exit 1; }
+          echo "custom domain: $(cat _site/CNAME)"
           find _site -type f | sort
 
       - uses: actions/upload-pages-artifact@v3
