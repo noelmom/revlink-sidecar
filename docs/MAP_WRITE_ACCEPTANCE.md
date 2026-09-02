@@ -57,8 +57,17 @@ SHA-256:
 fa08e4ed1569c71fb4faed87c2bf23bee82453d81933602a24277ff37d9b2eaa
 ```
 
-True power-cycle persistence remains the final live P4 acceptance step. Linux
-transport acceptance remains a separate gate.
+Since then the path has left acceptance and entered ordinary use. The
+maintainer has transferred several different maps to an AccessPort in service,
+each one read back and matched by SHA-256 before it was reported as done, and
+the written files persist across power cycles and are usable from the
+AccessPort afterwards. Unattended transfers — a map staged with no device
+attached, then written automatically after the next clean sync — have also
+been accepted on hardware.
+
+What remains is narrower than it once was: this document's scripted ceremony
+has not been captured as a single transcript, and Linux transport acceptance is
+still a separate gate.
 
 The platform-neutral C protocol component rebuilds all five captured `0x1622`
 requests byte-for-byte and produces upload chunks that match the Python

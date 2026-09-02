@@ -186,10 +186,15 @@ docs/               Architecture, safety model, networking, storage, bring-up
 
 ## Status
 
-Working prototype, actively developed. Read-only sync (listing, incremental
-download, checksum verification, atomic microSD publication) has been accepted
-on real hardware. Map writing is implemented and host-tested but remains
-gated — see [SAFETY.md](SAFETY.md) for exactly what is and is not proven.
+Actively developed, and in regular use on a real car. Read-only sync (listing,
+incremental download, checksum verification, atomic microSD publication) has
+been accepted on real hardware, and so has writing: maps have been transferred
+to an attached AccessPort many times, each verified by read-back, including
+unattended transfers after a sync. Deletion is accepted too.
+
+All three ship in the published image. Writes and deletes remain **gated** —
+not because the paths are unproven, but because they are the owner's decision
+to make. See [SAFETY.md](SAFETY.md) for exactly what is and is not proven.
 
 ## Contributing
 

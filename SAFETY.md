@@ -33,8 +33,12 @@ this project can perform it or trigger it.
 
 That is why the published image ships with writes compiled in: the failure
 this project can plausibly cause is a damaged file or a confused `maps/`
-directory on the AccessPort, not a damaged engine. It is still gated, because
-the write path has not completed its hardware round-trip.
+directory on the AccessPort, not a damaged engine.
+
+It stays gated anyway, and the reason is not doubt about the code. The write
+path has been accepted on hardware and is in regular use; the gate is there
+because writing to someone's device is their decision to make, not a default
+to be assumed. Consent starts locked on every boot for that reason alone.
 
 ## Deletion is gated separately
 
@@ -133,17 +137,21 @@ Claims here are limited to what has been verified on a real device.
   for every path outside the allowlist, then removed and confirmed absent by
   re-listing (`FILE DELETED ... confirmed_absent=yes`). A second attempt at the
   same path was refused without transmitting anything
-- Writing a map to an AccessPort. On the first live pass the device accepted
-  the file and a later read-only session recovered the exact bytes and digest.
-  That pass reported a misleading `ESP_ERR_INVALID_CRC` only because the local
-  cache's path validator rejected spaces in map names; the transfer itself had
-  already completed. Validators now accept safe spaces and parentheses, with
-  host tests covering those names. See docs/MAP_WRITE_ACCEPTANCE.md
+- Writing maps to an AccessPort, repeatedly and in ordinary use — not a single
+  lab pass. The maintainer has transferred several different maps to a device
+  in service, each read back and matched by SHA-256 before being reported as
+  done, and the files survive power cycles and are usable from the AccessPort
+  afterwards. The first live pass reported a misleading `ESP_ERR_INVALID_CRC`
+  because the local cache's path validator rejected spaces in map names; the
+  transfer itself had already completed. Validators now accept safe spaces and
+  parentheses, with host tests covering those names.
+  See docs/MAP_WRITE_ACCEPTANCE.md
 
 **Not yet accepted on hardware:**
 
-- The full ceremonial round-trip in docs/MAP_WRITE_ACCEPTANCE.md — listing
-  before and after, and the delete step — has not been completed end to end
+- The scripted round-trip in docs/MAP_WRITE_ACCEPTANCE.md as one recorded
+  ceremony. Every step in it has been done — writing, read-back verification,
+  listing, deletion — but on separate occasions rather than as one transcript
 - Startup-screen replacement against a device
 - Powered-hub behavior with two AccessPorts attached
 - Cooperative cancellation and shutdown *during* an active sync
