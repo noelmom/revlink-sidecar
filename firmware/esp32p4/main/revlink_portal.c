@@ -15,6 +15,7 @@
 #include "revlink_backup.h"
 #include "revlink_control_service.h"
 #include "revlink_device_service.h"
+#include "revlink_file_delete.h"
 #include "revlink_map_upload.h"
 #include "revlink_network_runtime.h"
 #include "revlink_runtime.h"
@@ -130,6 +131,17 @@ static void report_http_stack_headroom(void)
         lowest = headroom;
         ESP_LOGI(TAG, "http task stack: %u bytes free", (unsigned int)headroom);
     }
+}
+
+static const char *delete_state_name(revlink_accessport_delete_state_t state)
+{
+    switch (state) {
+    case REVLINK_ACCESSPORT_DELETE_IDLE:    return "idle";
+    case REVLINK_ACCESSPORT_DELETE_RUNNING: return "running";
+    case REVLINK_ACCESSPORT_DELETE_REMOVED: return "removed";
+    case REVLINK_ACCESSPORT_DELETE_FAILED:  return "failed";
+    }
+    return "idle";
 }
 
 static esp_err_t send_json(
@@ -362,6 +374,12 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
     revlink_map_upload_snapshot_t upload = {0};
     if (revlink_map_upload_snapshot(&upload) != ESP_OK) {
         upload.writes_compiled = control.snapshot.writes_compiled;
+    }
+    revlink_file_delete_snapshot_t removal = {0};
+    if (revlink_file_delete_snapshot(&removal) != ESP_OK) {
+        /* Unreadable reads as locked, never as permitted. */
+        removal.deletes_compiled = control.snapshot.deletes_compiled;
+        removal.consent_enabled = false;
     }
     bool attached_identity_known = false;
     revlink_ap_device_info_t attached_identity = {0};
@@ -611,7 +629,8 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         "\"totalFiles\":%u,\"listedFiles\":%u},"
         "\"safety\":{\"writesCompiled\":%s,\"deletesCompiled\":%s,"
         "\"shutdownRequested\":%s,\"writeConsent\":%s,"
-        "\"writeRecoveryRequired\":%s},"
+        "\"writeRecoveryRequired\":%s,\"deleteConsent\":%s,"
+        "\"deleteState\":\"%s\",\"deleteError\":%d},"
         "\"mapUpload\":{\"state\":\"%s\",\"kind\":\"%s\","
         "\"staged\":%s,\"name\":%s,"
         "\"destination\":%s,\"size\":%" PRIu32 ",\"platformError\":%d,"
@@ -693,6 +712,9 @@ static esp_err_t portal_status_handler(httpd_req_t *request)
         control.snapshot.shutdown_requested ? "true" : "false",
         upload.consent_enabled ? "true" : "false",
         upload.recovery_required ? "true" : "false",
+        removal.consent_enabled ? "true" : "false",
+        delete_state_name(removal.state),
+        (int)removal.platform_error,
         upload_state_name(upload.state),
         upload_kind_name(upload.kind),
         upload.staged ? "true" : "false",
@@ -2255,6 +2277,140 @@ static esp_err_t portal_map_auto_apply_handler(httpd_req_t *request)
           );
 }
 
+static esp_err_t portal_delete_consent_handler(httpd_req_t *request)
+{
+    if (!portal_header_is_valid(request)) {
+        return send_json(
+            request,
+            "403 Forbidden",
+            "{\"error\":\"Portal request header is missing\"}"
+        );
+    }
+    char body[32] = {0};
+    if (request->content_len <= 0
+        || (size_t)request->content_len >= sizeof(body)) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"Incomplete delete-consent request\"}"
+        );
+    }
+    size_t received = 0U;
+    while (received < (size_t)request->content_len) {
+        const int count = httpd_req_recv(
+            request,
+            body + received,
+            (size_t)request->content_len - received
+        );
+        if (count <= 0) {
+            return send_json(
+                request,
+                HTTPD_400,
+                "{\"error\":\"Incomplete delete-consent request\"}"
+            );
+        }
+        received += (size_t)count;
+    }
+    const bool enabled =
+        received == sizeof("enabled=true") - 1U
+        && memcmp(body, "enabled=true", received) == 0;
+    const bool disabled =
+        received == sizeof("enabled=false") - 1U
+        && memcmp(body, "enabled=false", received) == 0;
+    if (!enabled && !disabled) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"Delete consent must be true or false\"}"
+        );
+    }
+    const esp_err_t status = revlink_runtime_set_delete_consent(enabled);
+    return status == ESP_OK
+        ? send_json(request, HTTPD_200, "{\"ok\":true}")
+        : send_json(
+              request,
+              status == ESP_ERR_NOT_SUPPORTED
+                  ? "501 Not Implemented" : "409 Conflict",
+              "{\"error\":\"Unable to change delete consent\"}"
+          );
+}
+
+static esp_err_t portal_file_delete_handler(httpd_req_t *request)
+{
+    if (!portal_header_is_valid(request)) {
+        return send_json(
+            request,
+            "403 Forbidden",
+            "{\"error\":\"Portal request header is missing\"}"
+        );
+    }
+    char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY] = {0};
+    if (!read_required_header(
+            request,
+            "X-RevLink-Delete-Path",
+            path,
+            sizeof(path)
+        )) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"A file path is required\"}"
+        );
+    }
+
+    /*
+     * The attached device is the one that gets deleted from, and it must be
+     * the dataset the owner is looking at. Deleting from a device other than
+     * the one on screen is the mistake worth the most effort to prevent.
+     */
+    bool known = false;
+    revlink_ap_device_info_t identity = {0};
+    if (revlink_runtime_connected_accessport_snapshot(&known, &identity)
+            != ESP_OK
+        || !known) {
+        return send_json(
+            request,
+            "409 Conflict",
+            "{\"error\":\"Connect and identify one AccessPort first\"}"
+        );
+    }
+    if (!revlink_sd_selected_device_matches(&identity)) {
+        return send_json(
+            request,
+            "409 Conflict",
+            "{\"error\":\"Select the attached AccessPort dataset first\"}"
+        );
+    }
+    const revlink_sync_snapshot_t sync = revlink_runtime_sync_snapshot();
+    if (sync.state == REVLINK_SYNC_QUEUED
+        || sync.state == REVLINK_SYNC_RUNNING
+        || sync.state == REVLINK_SYNC_CANCELLING) {
+        return send_json(
+            request,
+            "409 Conflict",
+            "{\"error\":\"Wait for synchronization to finish\"}"
+        );
+    }
+
+    const esp_err_t status = revlink_file_delete_request(&identity, path);
+    if (status == ESP_OK) {
+        return send_json(
+            request,
+            "202 Accepted",
+            "{\"ok\":true,\"queued\":true}"
+        );
+    }
+    return send_json(
+        request,
+        status == ESP_ERR_NOT_SUPPORTED
+            ? "501 Not Implemented"
+            : (status == ESP_ERR_INVALID_ARG ? HTTPD_400 : "409 Conflict"),
+        status == ESP_ERR_INVALID_ARG
+            ? "{\"error\":\"Only a file directly inside maps/ or datalog/ can be deleted\"}"
+            : "{\"error\":\"Deletion was refused by a safety gate\"}"
+    );
+}
+
 static esp_err_t portal_map_discard_handler(httpd_req_t *request)
 {
     if (!portal_header_is_valid(request)) {
@@ -2837,6 +2993,16 @@ esp_err_t revlink_portal_register(httpd_handle_t server)
             "/api/portal/maps/stage",
             HTTP_POST,
             portal_map_stage_handler
+        },
+        {
+            "/api/portal/deletes",
+            HTTP_POST,
+            portal_delete_consent_handler
+        },
+        {
+            "/api/portal/file/delete",
+            HTTP_POST,
+            portal_file_delete_handler
         },
         {
             "/api/portal/maps/discard",
