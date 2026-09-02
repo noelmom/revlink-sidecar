@@ -652,6 +652,13 @@
       const size=document.createElement('div');size.className='file-size';size.textContent=bytes(file.size);const date=document.createElement('small');date.textContent=file.initialSyncUtc?new Date(file.initialSyncUtc*1000).toLocaleDateString():'';size.append(date);
       const buttons=document.createElement('div');buttons.className='row-buttons';const download=document.createElement('button');download.className='icon-btn';download.textContent=file.kind==='datalog'?'CSV':'Download';download.onclick=()=>downloadFile(file);const notes=document.createElement('button');notes.className=`note-button${file.note||file.mapDigest?' saved':''}`;notes.textContent=file.kind==='datalog'?(file.note||file.mapDigest?'Details':'Add details'):(file.note?'Notes':'Add note');buttons.append(download,notes);
       if(deletionAvailable()&&file.onDevice!==false){const remove=document.createElement('button');remove.className='icon-btn danger';remove.textContent='Delete';remove.onclick=()=>deleteDeviceFile(file,remove);buttons.append(remove)}
+      /*
+       * Clearing the Sidecar's own copy is always offered: it speaks to no
+       * device, so it does not wait for one to be attached, and it is how a
+       * full card gets emptied without going to find a computer — which is
+       * the thing this product exists to avoid.
+       */
+      {const forget=document.createElement('button');forget.className='icon-btn danger';forget.textContent=file.onDevice===false?'Remove':'Remove from Sidecar';forget.onclick=()=>forgetCachedFile(file,forget);buttons.append(forget)}
       const editor=document.createElement('div');editor.className='note-editor';
       const textarea=document.createElement('textarea');textarea.maxLength=767;textarea.placeholder='Conditions, date or time, tuner instructions, or anything you want to remember…';textarea.value=file.note||'';editor.append(textarea);
       let mapSelect=null;
@@ -921,15 +928,54 @@
         &&s.device?.available&&selectedDatasetIsAttached()
         &&!s.sync?.active&&safety.deleteState!=='running');
     }
+    /*
+     * Removing the Sidecar's copy is the only action in the product that can
+     * leave a file existing nowhere. Everywhere else a copy survives: delete
+     * from the AccessPort and the Sidecar still has it, remove from the
+     * Sidecar and the AccessPort still has it. So anything that would clear
+     * the last copy says so in those words and offers the download first,
+     * rather than burying it in a sentence about being unable to undo.
+     */
+    async function confirmLosingLastCopy(file,lead){
+      const gone=file.onDevice===false;
+      const parts=[lead,''];
+      parts.push(gone
+        ?'The AccessPort no longer has this file, so the Sidecar is holding the only copy. Removing it here deletes it for good.'
+        :'This will be the only copy left once the AccessPort\u2019s is gone. Removing it here deletes it for good.');
+      parts.push('','The Sidecar has no recycle bin. Download it first if you might want it again.');
+      if(!confirm(parts.join('\n')))return false;
+      if(confirm(`Download ${filename(file.path)} to this device before removing it?`)){
+        await downloadFile(file);
+        return confirm('Downloaded. Remove it from the Sidecar now?')
+      }
+      return true
+    }
     async function deleteDeviceFile(file,button){
-      if(!confirm(`Delete ${file.path} from the AccessPort?\n\nThis removes the file from the device itself and cannot be undone from the Sidecar. The Sidecar's own cached copy is kept.`))return;
+      if(!confirm(`Delete ${file.path} from the AccessPort?\n\nThis removes the file from the device itself and cannot be undone from the Sidecar. The Sidecar keeps its own cached copy, so the file stays downloadable from here.`))return;
+      /*
+       * Asked separately, and only after the first answer, because it is a
+       * different decision with a different consequence. Declining leaves the
+       * cached copy, which is the safe outcome, so it is what happens if the
+       * owner simply dismisses this.
+       */
+      let both=confirm(`Also remove the Sidecar\u2019s cached copy of ${filename(file.path)}?\n\nOK\u2003 remove from both, leaving no copy anywhere\nCancel\u2003 delete from the AccessPort only and keep the Sidecar\u2019s copy`);
+      if(both&&!await confirmLosingLastCopy(file,`Remove ${filename(file.path)} from both the AccessPort and the Sidecar?`))both=false;
       button.disabled=true;
       try{
-        await jsonRequest('/api/portal/file/delete',{method:'POST',timeoutMs:30000,headers:{...portalHeader,'X-RevLink-Delete-Path':file.path}});
-        toast(`Deleting ${file.path}\u2026`);
+        await jsonRequest('/api/portal/file/delete',{method:'POST',timeoutMs:30000,headers:{...portalHeader,'X-RevLink-Delete-Path':file.path,'X-RevLink-Delete-Scope':both?'both':'device'}});
+        toast(both?`Deleting ${file.path} from both\u2026`:`Deleting ${file.path}\u2026`);
         await loadStatus();
         // The listing only changes once the device confirms, so re-read it.
         setTimeout(()=>{loadFiles();loadStatus()},6000)
+      }catch(error){if(!connectionError(error))toast(error.message);button.disabled=false}
+    }
+    async function forgetCachedFile(file,button){
+      if(!await confirmLosingLastCopy(file,`Remove ${filename(file.path)} from the Sidecar?`))return;
+      button.disabled=true;
+      try{
+        await jsonRequest('/api/portal/file/delete',{method:'POST',timeoutMs:30000,headers:{...portalHeader,'X-RevLink-Delete-Path':file.path,'X-RevLink-Delete-Scope':'sidecar'}});
+        toast(`Removed ${filename(file.path)} from the Sidecar`);
+        await loadFiles();await loadStatus()
       }catch(error){if(!connectionError(error))toast(error.message);button.disabled=false}
     }
     async function setDeleteConsent(enabled){

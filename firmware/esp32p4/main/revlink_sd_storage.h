@@ -225,6 +225,21 @@ void revlink_sd_device_scan_end(void *context, bool complete);
  */
 esp_err_t revlink_sd_mark_absent(const char *path);
 
+/*
+ * Removes the Sidecar's own cached copy of a file: its manifest entry, its
+ * object on the card, and any note or map tag attached to that exact version.
+ *
+ * The cache is content-addressed, so two catalogued paths holding identical
+ * bytes share one object. The object is unlinked only once nothing else
+ * refers to its digest; the manifest is the reference count.
+ *
+ * This is the one destructive operation with no copy left anywhere. Deleting
+ * from the AccessPort leaves the Sidecar's copy; deleting from the Sidecar
+ * leaves the AccessPort's. Doing both leaves nothing, and the Sidecar has no
+ * recycle bin either.
+ */
+esp_err_t revlink_sd_forget_cached(const char *path);
+
 esp_err_t revlink_sd_annotations_snapshot(
     revlink_sync_annotations_t *annotations
 );

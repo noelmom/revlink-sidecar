@@ -694,6 +694,80 @@ int main(void)
     free(presence_text);
     free(presence);
 
+    /* ---- removing a cached entry ------------------------------------ */
+    /*
+     * The cache is content-addressed: two paths holding identical bytes share
+     * one object on the card. Removing one of them must not remove an object
+     * the other still points at, which is why callers ask how many entries
+     * carry a digest before they unlink anything.
+     */
+    revlink_sync_manifest_t *removal = calloc(1U, sizeof(*removal));
+    require_true(removal != NULL, "removal manifest allocation");
+    revlink_sync_manifest_init(removal);
+    uint8_t shared_digest[REVLINK_SYNC_SHA256_BYTES];
+    uint8_t lone_digest[REVLINK_SYNC_SHA256_BYTES];
+    fill_digest(shared_digest, 0x70U);
+    fill_digest(lone_digest, 0x90U);
+    require_true(
+        revlink_sync_manifest_upsert(
+            removal, (const uint8_t *)"maps/A.ptm", 10U,
+            1U, 64U, shared_digest, "a.ptm"
+        ) == REVLINK_SYNC_OK
+        && revlink_sync_manifest_upsert(
+            removal, (const uint8_t *)"maps/B.ptm", 10U,
+            2U, 64U, shared_digest, "b.ptm"
+        ) == REVLINK_SYNC_OK
+        && revlink_sync_manifest_upsert(
+            removal, (const uint8_t *)"maps/C.ptm", 10U,
+            3U, 64U, lone_digest, "c.ptm"
+        ) == REVLINK_SYNC_OK
+        && removal->count == 3U,
+        "three entries, two of them sharing one digest"
+    );
+    require_true(
+        revlink_sync_manifest_digest_users(removal, shared_digest) == 2U
+            && revlink_sync_manifest_digest_users(removal, lone_digest) == 1U,
+        "digest users are counted"
+    );
+    require_true(
+        revlink_sync_manifest_remove(removal, (const uint8_t *)"maps/A.ptm", 10U)
+            && removal->count == 2U
+            && revlink_sync_manifest_find(
+                   removal, (const uint8_t *)"maps/A.ptm", 10U
+               ) == NULL,
+        "an entry can be removed"
+    );
+    require_true(
+        revlink_sync_manifest_digest_users(removal, shared_digest) == 1U,
+        "the shared object is still referenced after one of its paths goes"
+    );
+    /*
+     * Removal moves the last entry into the gap, so the surviving entries
+     * must still be findable by path afterwards — an index-based caller would
+     * have silently read the wrong row here.
+     */
+    require_true(
+        revlink_sync_manifest_find(
+            removal, (const uint8_t *)"maps/B.ptm", 10U
+        ) != NULL
+        && revlink_sync_manifest_find(
+            removal, (const uint8_t *)"maps/C.ptm", 10U
+        ) != NULL,
+        "surviving entries remain findable after a removal reorders them"
+    );
+    require_true(
+        !revlink_sync_manifest_remove(
+            removal, (const uint8_t *)"maps/Gone.ptm", 13U
+        ),
+        "removing an uncatalogued path reports that it was not there"
+    );
+    require_true(
+        revlink_sync_manifest_remove(removal, (const uint8_t *)"maps/B.ptm", 10U)
+            && revlink_sync_manifest_digest_users(removal, shared_digest) == 0U,
+        "the last user of a digest releases it"
+    );
+    free(removal);
+
     puts("sync manifest tests PASSED");
     return 0;
 }

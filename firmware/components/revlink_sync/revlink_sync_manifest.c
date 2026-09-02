@@ -278,6 +278,55 @@ bool revlink_sync_manifest_set_presence(
     return false;
 }
 
+bool revlink_sync_manifest_remove(
+    revlink_sync_manifest_t *manifest,
+    const uint8_t *path,
+    size_t path_length
+)
+{
+    if (manifest == NULL || !valid_path_bytes(path, path_length)) {
+        return false;
+    }
+    for (size_t index = 0U; index < manifest->count; ++index) {
+        revlink_sync_manifest_entry_t *entry = &manifest->entries[index];
+        if (strlen(entry->path) == path_length
+            && memcmp(entry->path, path, path_length) == 0) {
+            if (index + 1U < manifest->count) {
+                *entry = manifest->entries[manifest->count - 1U];
+            }
+            memset(
+                &manifest->entries[manifest->count - 1U],
+                0,
+                sizeof(manifest->entries[0])
+            );
+            --manifest->count;
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t revlink_sync_manifest_digest_users(
+    const revlink_sync_manifest_t *manifest,
+    const uint8_t sha256[REVLINK_SYNC_SHA256_BYTES]
+)
+{
+    if (manifest == NULL || sha256 == NULL) {
+        return 0U;
+    }
+    size_t users = 0U;
+    for (size_t index = 0U; index < manifest->count; ++index) {
+        if (memcmp(
+                manifest->entries[index].sha256,
+                sha256,
+                REVLINK_SYNC_SHA256_BYTES
+            ) == 0) {
+            ++users;
+        }
+    }
+    return users;
+}
+
 const char *revlink_sync_presence_name(revlink_sync_presence_t presence)
 {
     switch (presence) {

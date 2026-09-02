@@ -66,6 +66,51 @@ copies surviving the device is the point of the product — but it means a row
 can outlive the file it came from, and a second delete of the same path is
 refused without transmitting anything.
 
+## Removing the Sidecar's own copy
+
+Since 0.2.3 the cached copy can be removed too, as a separate choice:
+
+| Scope | What goes | What is left |
+| --- | --- | --- |
+| `device` (default) | The file on the AccessPort | The Sidecar's cached copy |
+| `sidecar` | The Sidecar's cached copy | Whatever the AccessPort has |
+| `both` | Both | Nothing |
+
+`both` is the only operation in the product that can leave a file existing
+nowhere, so the portal says that in those words and offers to download it
+first. It is also asked as a second question rather than bundled into the
+first, because "delete from the device" and "destroy the last copy" are
+different decisions and a single prompt would quietly turn one into the other.
+Declining at any point keeps the cached copy.
+
+Order matters for `both`: the device delete goes first and the cached copy is
+dropped only once the device has confirmed. If the cache went first and the
+device delete then failed, the owner would have lost their only spare copy of
+a file that is still sitting on the AccessPort.
+
+Clearing the cache alone never speaks to a device, so it does not need one
+attached — which is the point, since a full card is exactly the situation
+where you cannot conveniently go and find a computer. For the same reason it
+does not require the AccessPort delete consent: that switch exists to protect
+somebody's device, and the microSD is the owner's own storage, which they can
+already empty by taking the card out. Granting one permission on the strength
+of another is the thing the write and delete gates are kept apart to avoid.
+
+The cache is content-addressed, so two catalogued paths holding identical
+bytes share one object on the card. The manifest is the reference count: the
+object is unlinked only when the last entry naming that digest has gone, and
+the catalogue is saved before the payload is unlinked. Losing power between
+the two leaves an object nothing points at — wasted space the next write of
+the same content reuses — rather than a catalogue row pointing at a file the
+portal would then offer for download and fail to produce.
+
+Notes and map tags are version-scoped by digest, and go with the last entry
+that carried it. A datalog tagged with a map that has since been removed keeps
+its tag and the portal renders it as *previously tagged map (not in this
+cache)*, rather than dangling or silently losing the association.
+
+## The cached copy stays by default
+
 Since 0.2.2 the row says so. Each cached file records whether the last
 completed listing found it on the device, and one that is gone is badged
 **Sidecar only** and stops offering a Delete button. The flag is three-valued:

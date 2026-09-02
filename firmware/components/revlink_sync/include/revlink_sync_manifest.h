@@ -104,6 +104,29 @@ bool revlink_sync_manifest_set_presence(
     revlink_sync_presence_t presence
 );
 
+/*
+ * Drops one entry. Returns false when the path is not catalogued.
+ *
+ * Order is not part of the manifest's meaning, so the last entry is moved
+ * into the gap rather than shifting the tail. Callers that hold an index
+ * across this call are wrong to; find by path instead.
+ */
+bool revlink_sync_manifest_remove(
+    revlink_sync_manifest_t *manifest,
+    const uint8_t *path,
+    size_t path_length
+);
+
+/*
+ * How many entries carry this digest. The cache is content-addressed, so two
+ * paths with identical bytes share one object on the card, and removing an
+ * entry must not remove an object another entry still points at.
+ */
+size_t revlink_sync_manifest_digest_users(
+    const revlink_sync_manifest_t *manifest,
+    const uint8_t sha256[REVLINK_SYNC_SHA256_BYTES]
+);
+
 const char *revlink_sync_status_name(revlink_sync_status_t status);
 
 #ifdef __cplusplus

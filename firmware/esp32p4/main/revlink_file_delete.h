@@ -38,10 +38,18 @@ esp_err_t revlink_file_delete_set_consent(bool enabled);
  * Delete one file from the attached AccessPort. `path` must name a file
  * directly inside maps/ or datalog/; the transport re-validates it, confirms
  * the file is present, and confirms it is gone afterwards.
+ *
+ * `forget_cached_copy` additionally drops the Sidecar's own cached copy —
+ * but only once the device has confirmed the removal. The order matters: if
+ * the cache went first and the device delete then failed, the owner would
+ * have lost their only spare copy of a file that is still on the AccessPort.
+ * Removing the cache alone does not go through here at all; it never touches
+ * a device, so it does not need one attached. See revlink_sd_forget_cached().
  */
 esp_err_t revlink_file_delete_request(
     const revlink_ap_device_info_t *identity,
-    const char *path
+    const char *path,
+    bool forget_cached_copy
 );
 
 esp_err_t revlink_file_delete_snapshot(

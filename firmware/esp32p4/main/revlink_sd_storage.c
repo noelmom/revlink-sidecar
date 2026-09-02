@@ -1948,6 +1948,132 @@ void revlink_sd_device_scan_end(void *context, bool complete)
     publish_portal_snapshot();
 }
 
+/*
+ * Drops a note and a map tag for one exact file version. Called only when the
+ * last manifest entry carrying that digest has gone, so nothing can still be
+ * displaying them.
+ */
+static void forget_annotations_for_digest(
+    const uint8_t sha256[REVLINK_SYNC_ANNOTATION_SHA256_BYTES]
+)
+{
+    char path[REVLINK_SD_DOWNLOAD_PATH_CAPACITY];
+    char temporary[REVLINK_SD_DOWNLOAD_PATH_CAPACITY];
+    char backup[REVLINK_SD_DOWNLOAD_PATH_CAPACITY];
+    if (annotation_paths(
+            path,
+            sizeof(path),
+            temporary,
+            sizeof(temporary),
+            backup,
+            sizeof(backup)
+        ) != ESP_OK) {
+        return;
+    }
+    revlink_sync_annotations_t *annotations = calloc(1U, sizeof(*annotations));
+    if (annotations == NULL) {
+        ESP_LOGW(TAG, "Unable to drop annotations: no memory");
+        return;
+    }
+    if (load_annotations(path, temporary, backup, annotations) != ESP_OK
+        || revlink_sync_annotations_find(annotations, sha256) == NULL) {
+        free(annotations);
+        return;
+    }
+    /* An annotation can hold a note and a map tag independently; clearing one
+     * leaves the other, so clear both to retire the row. */
+    (void)revlink_sync_annotations_set_map(annotations, sha256, NULL, 0U);
+    (void)revlink_sync_annotations_set(annotations, sha256, "", 0U, 0U);
+    if (save_annotations(path, temporary, backup, annotations) != ESP_OK) {
+        ESP_LOGW(TAG, "Cached copy removed but its note could not be dropped");
+    }
+    free(annotations);
+}
+
+esp_err_t revlink_sd_forget_cached(const char *path)
+{
+    if (path == NULL || path[0] == '\0') return ESP_ERR_INVALID_ARG;
+    if (!storage_device.selected || !sync_manifest_ready
+        || sync_manifest == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const size_t path_length = strlen(path);
+    const revlink_sync_manifest_entry_t *entry = revlink_sync_manifest_find(
+        sync_manifest,
+        (const uint8_t *)path,
+        path_length
+    );
+    if (entry == NULL) return ESP_ERR_NOT_FOUND;
+
+    /* Copy what is needed before the entry is removed from under us. */
+    uint8_t digest[REVLINK_SYNC_SHA256_BYTES];
+    memcpy(digest, entry->sha256, sizeof(digest));
+    char cache_name[REVLINK_SYNC_CACHE_NAME_CAPACITY];
+    memcpy(cache_name, entry->cache_name, sizeof(cache_name));
+    const revlink_sd_file_kind_t kind = kind_for_manifest_path(path);
+
+    char object_path[REVLINK_SD_DOWNLOAD_PATH_CAPACITY];
+    const bool have_object_path = format_path(
+        object_path,
+        sizeof(object_path),
+        "%s/%s",
+        object_dir_for_kind(kind),
+        cache_name
+    ) == ESP_OK;
+
+    if (!revlink_sync_manifest_remove(
+            sync_manifest,
+            (const uint8_t *)path,
+            path_length
+        )) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /*
+     * Save the catalogue before unlinking the payload. If power is lost
+     * between the two, the card keeps an object nothing points at — wasted
+     * space that the next write of the same content reuses. The other order
+     * would leave a manifest row pointing at a file that is gone, which reads
+     * to the portal as a cached file it can offer for download and then
+     * cannot produce.
+     */
+    const esp_err_t saved = save_sync_manifest(sync_manifest);
+    if (saved != ESP_OK) {
+        ESP_LOGE(
+            TAG,
+            "Could not record the removal of '%s': %s",
+            path,
+            esp_err_to_name(saved)
+        );
+        return saved;
+    }
+
+    const size_t remaining =
+        revlink_sync_manifest_digest_users(sync_manifest, digest);
+    if (remaining == 0U) {
+        if (have_object_path && unlink(object_path) != 0 && errno != ENOENT) {
+            ESP_LOGW(
+                TAG,
+                "Cached object for '%s' could not be unlinked: errno=%d",
+                path,
+                errno
+            );
+        }
+        forget_annotations_for_digest(digest);
+    } else {
+        ESP_LOGI(
+            TAG,
+            "Kept the cached object for '%s': %u other cached file(s) hold "
+            "identical content",
+            path,
+            (unsigned int)remaining
+        );
+    }
+    ESP_LOGW(TAG, "Removed the Sidecar's cached copy of '%s'", path);
+    publish_portal_snapshot();
+    return ESP_OK;
+}
+
 esp_err_t revlink_sd_mark_absent(const char *path)
 {
     if (path == NULL || path[0] == '\0') return ESP_ERR_INVALID_ARG;

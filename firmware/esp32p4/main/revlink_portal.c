@@ -1570,6 +1570,28 @@ static bool read_required_header(
            ) == ESP_OK;
 }
 
+/*
+ * Reads a header that may legitimately be absent. Returns false only when the
+ * header is present but does not fit, so a caller can tell "not sent" from
+ * "sent something too long" and refuse the second rather than silently
+ * falling back to a default the sender did not ask for.
+ */
+static bool read_optional_header(
+    httpd_req_t *request,
+    const char *header,
+    char *value,
+    size_t capacity
+)
+{
+    if (value == NULL || capacity == 0U) return false;
+    value[0] = '\0';
+    const size_t length = httpd_req_get_hdr_value_len(request, header);
+    if (length == 0U) return true;
+    if (length >= capacity) return false;
+    return httpd_req_get_hdr_value_str(request, header, value, capacity)
+        == ESP_OK;
+}
+
 static esp_err_t portal_startup_profiles_handler(httpd_req_t *request)
 {
     if (!portal_header_is_valid(request)) {
@@ -2361,23 +2383,6 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
             "{\"error\":\"Portal request header is missing\"}"
         );
     }
-    /*
-     * Whether this build can delete at all does not depend on what is
-     * attached, so answer that first. Checking the device before the
-     * capability would tell someone to connect an AccessPort in order to
-     * discover that the feature is not present.
-     */
-    revlink_file_delete_snapshot_t removal = {0};
-    (void)revlink_file_delete_snapshot(&removal);
-    if (!removal.deletes_compiled) {
-        return send_json(
-            request,
-            "501 Not Implemented",
-            "{\"error\":\"This build cannot delete files from an AccessPort. "
-            "Deletion is compiled out of published images.\"}"
-        );
-    }
-
     char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY] = {0};
     if (!read_required_header(
             request,
@@ -2389,6 +2394,73 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
             request,
             HTTPD_400,
             "{\"error\":\"A file path is required\"}"
+        );
+    }
+
+    /*
+     * Which copies to remove. Absent means "device", which is what every
+     * caller before this option existed meant.
+     */
+    char scope[16] = {0};
+    if (!read_optional_header(request, "X-RevLink-Delete-Scope", scope,
+                              sizeof(scope))
+        || scope[0] == '\0') {
+        (void)snprintf(scope, sizeof(scope), "device");
+    }
+    const bool touch_device =
+        strcmp(scope, "device") == 0 || strcmp(scope, "both") == 0;
+    const bool touch_cache =
+        strcmp(scope, "sidecar") == 0 || strcmp(scope, "both") == 0;
+    if (!touch_device && !touch_cache) {
+        return send_json(
+            request,
+            HTTPD_400,
+            "{\"error\":\"Delete scope must be device, sidecar, or both\"}"
+        );
+    }
+
+    /*
+     * Clearing the Sidecar's own cache never speaks to an AccessPort, so it
+     * needs neither one attached nor the consent that governs writing to one.
+     * That consent exists to protect somebody's device; the microSD is the
+     * owner's own storage, which they can already empty by taking the card
+     * out. Gating it behind a switch labelled "delete files from an
+     * AccessPort" would be granting one permission on the strength of
+     * another, which is the exact thing the write and delete gates are kept
+     * apart to avoid. The protection here is the confirmation in the portal,
+     * which says the file will not exist anywhere afterwards.
+     */
+    if (touch_cache && !touch_device) {
+        const esp_err_t forgotten = revlink_sd_forget_cached(path);
+        if (forgotten == ESP_OK) {
+            return send_json(
+                request,
+                HTTPD_200,
+                "{\"ok\":true,\"removedFromSidecar\":true}"
+            );
+        }
+        return send_json(
+            request,
+            forgotten == ESP_ERR_NOT_FOUND ? "404 Not Found" : "409 Conflict",
+            forgotten == ESP_ERR_NOT_FOUND
+                ? "{\"error\":\"The Sidecar has no cached copy of that file\"}"
+                : "{\"error\":\"Select a dataset before removing cached files\"}"
+        );
+    }
+
+    /*
+     * Whether this build can delete from a device does not depend on what is
+     * attached, so answer that first. Checking the device before the
+     * capability would tell someone to connect an AccessPort in order to
+     * discover that the feature is not present.
+     */
+    revlink_file_delete_snapshot_t removal = {0};
+    (void)revlink_file_delete_snapshot(&removal);
+    if (!removal.deletes_compiled) {
+        return send_json(
+            request,
+            "501 Not Implemented",
+            "{\"error\":\"This build cannot delete files from an AccessPort.\"}"
         );
     }
 
@@ -2426,12 +2498,15 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
         );
     }
 
-    const esp_err_t status = revlink_file_delete_request(&identity, path);
+    const esp_err_t status =
+        revlink_file_delete_request(&identity, path, touch_cache);
     if (status == ESP_OK) {
         return send_json(
             request,
             "202 Accepted",
-            "{\"ok\":true,\"queued\":true}"
+            touch_cache
+                ? "{\"ok\":true,\"queued\":true,\"alsoRemovingCachedCopy\":true}"
+                : "{\"ok\":true,\"queued\":true}"
         );
     }
     return send_json(

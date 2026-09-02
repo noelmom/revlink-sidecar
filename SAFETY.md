@@ -21,7 +21,8 @@ without being asked; see automatic application below.
 | Upload a map file | **Gated** | Compile flag + persistent owner consent. Copies a `.ptm` onto the AccessPort's storage; it does not install anything onto an ECU |
 | Auto-apply a staged map | **Gated** | The above, plus a separate preference and a matching pinned device — see [STAGED_MAPS.md](docs/STAGED_MAPS.md) |
 | Replace the startup screen | **Gated** | Fixed destination only |
-| Delete a file | **Gated** | `maps/` and `datalog/` only, one level deep. Its own compile flag and its own consent, neither implied by the write gates |
+| Delete a file from the AccessPort | **Gated** | `maps/` and `datalog/` only, one level deep. Its own compile flag and its own consent, neither implied by the write gates |
+| Remove the Sidecar's cached copy | Confirmed per action | The owner's own microSD. No device involved, so no AccessPort consent — but it is the one action that can leave a file nowhere, so the portal says so and offers the download first |
 | ECU flashing / live tuning | **Out of scope permanently** | Not a goal of this project |
 
 ## What a "write" is here
@@ -202,6 +203,25 @@ their reads with `sizeof(buffer)`, which silently becomes the size of a
 pointer the moment the array becomes a `malloc` — a four-byte read loop that
 passes every test. They name the constant now, and the file has no
 `sizeof(buffer)` left in it.
+
+## The only action that can leave no copy
+
+Every destructive operation here normally leaves a copy somewhere. Delete from
+the AccessPort and the Sidecar still has it. Remove it from the Sidecar and the
+AccessPort still has it. Removing both is the single exception, and the Sidecar
+has no recycle bin any more than the AccessPort does.
+
+So it is asked as its own question, after the first one, and never bundled into
+a prompt about deleting from the device. The confirmation says the file will
+not exist anywhere afterwards and offers to download it first. Declining
+anywhere in the chain keeps the cached copy, because that is the outcome you
+can still recover from.
+
+Removing the cache alone deliberately does *not* require the AccessPort delete
+consent. That switch exists to protect somebody's device; the microSD is the
+owner's own storage, which they can already empty by removing the card.
+Granting one permission on the strength of another is the thing the write and
+delete gates are kept separate to avoid, and it would apply just as much here.
 
 ## Presence is three-valued, and absence needs evidence
 

@@ -26,6 +26,10 @@ typedef struct {
     revlink_accessport_delete_state_t state;
     esp_err_t platform_error;
     char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY];
+    /* Whether the in-flight delete should also drop the Sidecar's copy. Read
+     * only after the device confirms removal, so a failed delete leaves the
+     * local copy exactly where it was. */
+    bool forget_cached_copy;
 } file_delete_service_t;
 
 static file_delete_service_t service;
@@ -113,6 +117,37 @@ static void observe_delete(
                 esp_err_to_name(marked)
             );
         }
+        bool also_forget = false;
+        if (take_lock()) {
+            also_forget = service.forget_cached_copy;
+            service.forget_cached_copy = false;
+            give_lock();
+        }
+        if (also_forget) {
+            /*
+             * Only now. The owner asked for both copies to go, and the device
+             * has confirmed its own is gone; had it failed, the cached copy
+             * would still be the only one left and dropping it first would
+             * have destroyed exactly the thing that made the failure
+             * recoverable.
+             */
+            const esp_err_t forgotten =
+                revlink_sd_forget_cached(event->request.path);
+            if (forgotten != ESP_OK && forgotten != ESP_ERR_NOT_FOUND) {
+                ESP_LOGW(
+                    TAG,
+                    "Deleted '%s' from the device but kept the cached copy: "
+                    "%s",
+                    event->request.path,
+                    esp_err_to_name(forgotten)
+                );
+            }
+        }
+    } else if (event->state == REVLINK_ACCESSPORT_DELETE_FAILED) {
+        if (take_lock()) {
+            service.forget_cached_copy = false;
+            give_lock();
+        }
     }
 }
 #endif
@@ -170,7 +205,8 @@ esp_err_t revlink_file_delete_set_consent(bool enabled)
 
 esp_err_t revlink_file_delete_request(
     const revlink_ap_device_info_t *identity,
-    const char *path
+    const char *path,
+    bool forget_cached_copy
 )
 {
 #if CONFIG_REVLINK_ALLOW_DEVICE_DELETES
@@ -228,6 +264,7 @@ esp_err_t revlink_file_delete_request(
     if (copied) {
         service.state = REVLINK_ACCESSPORT_DELETE_RUNNING;
         service.platform_error = ESP_OK;
+        service.forget_cached_copy = forget_cached_copy;
         (void)copy_bounded(service.path, sizeof(service.path), path);
     }
     give_lock();
@@ -249,6 +286,7 @@ esp_err_t revlink_file_delete_request(
 #else
     (void)identity;
     (void)path;
+    (void)forget_cached_copy;
     return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
