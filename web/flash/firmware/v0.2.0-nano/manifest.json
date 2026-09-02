@@ -2,7 +2,7 @@
   "name": "RevLink Sidecar",
   "version": "0.2.0",
   "profile": "nano",
-  "buildDate": "2026-09-01",
+  "buildDate": "2026-09-02",
   "idfVersion": "v6.0.2",
   "chipFamily": "ESP32-P4",
   "deviceWrites": true,
@@ -39,8 +39,8 @@
     {
       "path": "revlink-sidecar.bin",
       "offset": 131072,
-      "size": 1383664,
-      "sha256": "544867413b0dc1e9346fe5380d6047359df691a854489b079594b33d63681059"
+      "size": 1389600,
+      "sha256": "53ceecf443fed0918421f41e7ba16c77ba7055cb698779545567b9c68685b84a"
     }
   ]
 }
