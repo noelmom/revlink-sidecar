@@ -2344,6 +2344,23 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
             "{\"error\":\"Portal request header is missing\"}"
         );
     }
+    /*
+     * Whether this build can delete at all does not depend on what is
+     * attached, so answer that first. Checking the device before the
+     * capability would tell someone to connect an AccessPort in order to
+     * discover that the feature is not present.
+     */
+    revlink_file_delete_snapshot_t removal = {0};
+    (void)revlink_file_delete_snapshot(&removal);
+    if (!removal.deletes_compiled) {
+        return send_json(
+            request,
+            "501 Not Implemented",
+            "{\"error\":\"This build cannot delete files from an AccessPort. "
+            "Deletion is compiled out of published images.\"}"
+        );
+    }
+
     char path[REVLINK_ACCESSPORT_UPLOAD_PATH_CAPACITY] = {0};
     if (!read_required_header(
             request,
@@ -2402,12 +2419,10 @@ static esp_err_t portal_file_delete_handler(httpd_req_t *request)
     }
     return send_json(
         request,
-        status == ESP_ERR_NOT_SUPPORTED
-            ? "501 Not Implemented"
-            : (status == ESP_ERR_INVALID_ARG ? HTTPD_400 : "409 Conflict"),
+        status == ESP_ERR_INVALID_ARG ? HTTPD_400 : "409 Conflict",
         status == ESP_ERR_INVALID_ARG
             ? "{\"error\":\"Only a file directly inside maps/ or datalog/ can be deleted\"}"
-            : "{\"error\":\"Deletion was refused by a safety gate\"}"
+            : "{\"error\":\"Deletion is locked. Enable it in Settings, and check that no transfer is already running.\"}"
     );
 }
 
