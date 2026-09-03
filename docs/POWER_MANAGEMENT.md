@@ -54,6 +54,19 @@ from it:
 - **A map write or delete under way.** Those hold the USB host busy in a
   different pattern to a read sync and have not been measured separately.
 
+### Power path, confirmed
+
+Applying USB-C power to the charger board **starts charging the cell while the
+Nano stays running**. There is no drop-out, reset or re-enumeration at the
+moment external power arrives, which is the simultaneous-charge-and-load and
+seamless-handoff behaviour this section requires.
+
+Only that direction has been tested. **Removing** external power and having the
+cell take over without interrupting the P4 — the transition that actually
+matters for a car that has just been switched off, and the one the state model
+below depends on — has not been confirmed. Test it mid-sync, not idle: an
+interruption there is the case with something to lose.
+
 ### Reference parts
 
 A combination confirmed to power the Nano, tracked in issue #11:
