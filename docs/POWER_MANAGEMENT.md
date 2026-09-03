@@ -27,11 +27,15 @@ for the P4, C6 radio, microSD, and AccessPort USB host path.
 ## Measured draw
 
 Measured 2026-09-02 with an inline USB meter on the 5 V rail feeding the Nano's
-USB-C port, with an AccessPort attached and connecting, and during a sync:
+USB-C port, with an AccessPort attached:
 
-```text
-4.86 V    0.12 – 0.16 A    0.58 – 0.77 W
-```
+| Condition | | |
+| --- | --- | --- |
+| Steady, connected and syncing | 0.12 – 0.16 A | 0.58 – 0.77 W |
+| **Cold boot from battery, AccessPort attached, through the initial sync** | **peak 0.20 A** | **0.96 W** |
+
+at 4.85 – 4.86 V throughout. After the initial sync it settles back to the
+steady range.
 
 That is the whole system: ESP32-P4 with 32 MB PSRAM, the ESP32-C6 radio over
 SDIO, microSD, and the AccessPort as a downstream USB device. It is far lower
@@ -39,20 +43,32 @@ than the figure this section was written in anticipation of, and it changes
 what "enough peak current" has to mean — a 1 A supply has roughly six times the
 headroom needed for steady-state operation.
 
-For scale, on a 3.7 V 2000 mAh (7.4 Wh) cell through a boost at ~88%
-efficiency, that draw is about **0.12C** and gives roughly **8–10 hours**.
+The peak matters more than the steady figure, because it is what a supply has
+to be chosen against. 0.20 A is **20% of the TPS61023's 1 A ceiling**, so
+five times the headroom needed. On a 3.7 V 2000 mAh (7.4 Wh) cell through a
+boost at ~88% efficiency it is about **0.15C**, and runtime is roughly
+**6 hours** if it somehow held at peak, **8 or more** in practice.
 
-Two things this measurement does **not** cover, and neither should be inferred
-from it:
+### Cold boot from battery works
 
-- **Cold-boot inrush.** This was taken at steady state. Bringing up PSRAM and
-  the radio from cold is a transient an averaged USB meter will not show, and
-  it is the figure that decides whether a given boost converter can start the
-  board at all. Some boost converters stall on a load that draws full current
-  immediately; the Adafruit TPS61023 board is documented as one of them, above
-  roughly 200 mA.
-- **A map write or delete under way.** Those hold the USB host busy in a
-  different pattern to a read sync and have not been measured separately.
+This was the open question, because a boost converter that cannot start into
+the load makes the whole approach unusable. The Adafruit TPS61023 board is
+documented as stalling on a load that draws full current immediately, above
+roughly 200 mA.
+
+The measured cold-boot peak is **exactly 200 mA**, and the Sidecar starts
+anyway — the P4 evidently ramps as PSRAM and the radio come up rather than
+slamming to full draw at the instant power appears, which is the case the
+caution is about.
+
+That is a pass, but it is a pass at the boundary rather than with margin.
+Worth repeating **at a low state of charge**: as the cell droops the boost
+draws more input current for the same output, so a start that succeeds on a
+full cell is not proof of one on a nearly flat cell.
+
+One thing still unmeasured: **a map write or delete under way.** Those hold the
+USB host busy in a different pattern to a read sync and have not been measured
+separately.
 
 ### Power path, confirmed
 
