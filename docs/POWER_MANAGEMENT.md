@@ -29,13 +29,13 @@ for the P4, C6 radio, microSD, and AccessPort USB host path.
 Measured 2026-09-02 with an inline USB meter on the 5 V rail feeding the Nano's
 USB-C port, with an AccessPort attached:
 
-| Condition | | |
-| --- | --- | --- |
-| Steady, connected and syncing | 0.12 – 0.16 A | 0.58 – 0.77 W |
-| **Cold boot from battery, AccessPort attached, through the initial sync** | **peak 0.20 A** | **0.96 W** |
+| Condition | Current | Voltage | Power |
+| --- | --- | --- | --- |
+| Steady, connected and syncing | 0.12 – 0.16 A | 4.86 V | 0.58 – 0.77 W |
+| Cold boot, AccessPort attached, initial sync | 0.20 A | 4.85 V | 0.96 W |
+| **Highest seen — cold boot after an unplug/replug** | **0.28 A** | **4.74 V** | **1.32 W** |
 
-at 4.85 – 4.86 V throughout. After the initial sync it settles back to the
-steady range.
+After the initial sync it settles back to the steady range.
 
 That is the whole system: ESP32-P4 with 32 MB PSRAM, the ESP32-C6 radio over
 SDIO, microSD, and the AccessPort as a downstream USB device. It is far lower
@@ -43,11 +43,36 @@ than the figure this section was written in anticipation of, and it changes
 what "enough peak current" has to mean — a 1 A supply has roughly six times the
 headroom needed for steady-state operation.
 
-The peak matters more than the steady figure, because it is what a supply has
-to be chosen against. 0.20 A is **20% of the TPS61023's 1 A ceiling**, so
-five times the headroom needed. On a 3.7 V 2000 mAh (7.4 Wh) cell through a
-boost at ~88% efficiency it is about **0.15C**, and runtime is roughly
-**6 hours** if it somehow held at peak, **8 or more** in practice.
+0.28 A is only **28% of the TPS61023's 1 A ceiling**, and about 0.2C on a
+2000 mAh cell, so current is not the constraint. Runtime is roughly 5 hours if
+it somehow held at that peak and 8 or more in practice.
+
+### The constraint is voltage, not current
+
+Those four points make a load line, and it slopes:
+
+```text
+0.12 A -> 4.86 V
+0.16 A -> 4.86 V
+0.20 A -> 4.85 V
+0.28 A -> 4.74 V
+```
+
+That is roughly **1.4 ohm** of effective series resistance between the boost
+and the meter. USB VBUS is specified as 4.75 – 5.25 V, so at 0.28 A the rail is
+already a hair under the floor, and extrapolating the same slope gives about
+4.6 V at 0.35 A and 4.4 V at 0.5 A.
+
+**1.4 ohm is far too high to be the boost converter's regulation.** Almost all
+of it will be the path, not the part: the USB meter, a USB-C adapter, the cable
+and two connectors. Before concluding anything about the board, measure at the
+Nano's own input rather than at the meter, and prefer feeding the board's
+external 5 V header directly over going through a USB-C cable. The header
+exists for this and removes the connector chain entirely.
+
+Current headroom flatters this design; voltage margin is what to watch as load
+grows. The AccessPort's VBUS derives from this same rail, so whatever the rail
+sags to, the attached device sees less.
 
 ### Cold boot from battery works
 
