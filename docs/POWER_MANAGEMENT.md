@@ -24,6 +24,53 @@ The controller must support simultaneous charging and system load, seamless
 handoff to the battery, reverse-current protection, and enough peak current
 for the P4, C6 radio, microSD, and AccessPort USB host path.
 
+## Measured draw
+
+Measured 2026-09-02 with an inline USB meter on the 5 V rail feeding the Nano's
+USB-C port, with an AccessPort attached and connecting, and during a sync:
+
+```text
+4.86 V    0.12 – 0.16 A    0.58 – 0.77 W
+```
+
+That is the whole system: ESP32-P4 with 32 MB PSRAM, the ESP32-C6 radio over
+SDIO, microSD, and the AccessPort as a downstream USB device. It is far lower
+than the figure this section was written in anticipation of, and it changes
+what "enough peak current" has to mean — a 1 A supply has roughly six times the
+headroom needed for steady-state operation.
+
+For scale, on a 3.7 V 2000 mAh (7.4 Wh) cell through a boost at ~88%
+efficiency, that draw is about **0.12C** and gives roughly **8–10 hours**.
+
+Two things this measurement does **not** cover, and neither should be inferred
+from it:
+
+- **Cold-boot inrush.** This was taken at steady state. Bringing up PSRAM and
+  the radio from cold is a transient an averaged USB meter will not show, and
+  it is the figure that decides whether a given boost converter can start the
+  board at all. Some boost converters stall on a load that draws full current
+  immediately; the Adafruit TPS61023 board is documented as one of them, above
+  roughly 200 mA.
+- **A map write or delete under way.** Those hold the USB host busy in a
+  different pattern to a read sync and have not been measured separately.
+
+### Reference parts
+
+A combination confirmed to power the Nano, tracked in issue #11:
+
+| | |
+| --- | --- |
+| Charger, power path and boost | Adafruit 6106 — bq25185 with a TPS61023, 5 V at 1 A max |
+| Cell | EEMB LP103454, 3.7 V 2000 mAh, 54 × 34 × 10.3 mm |
+
+Take care ordering: Adafruit also sells a bq25185 board with a **3.3 V buck**
+instead of the 5 V boost. That variant cannot power the Nano and cannot supply
+USB-compliant VBUS to the AccessPort.
+
+The cell does not fit the current 55 × 55 mm enclosure — it is 54 mm long, so
+the interior is short by about 3 mm at 2 mm walls, before the board or the
+display. A battery build needs a new enclosure regardless, to house the charger.
+
 ## Deterministic state model
 
 ```text
