@@ -35,6 +35,9 @@ USB-C port, with an AccessPort attached:
 | Cold boot, AccessPort attached, initial sync | 0.20 A | 4.85 V | 0.96 W |
 | **Highest seen — cold boot after an unplug/replug** | **0.28 A** | **4.74 V** | **1.32 W** |
 
+The 4.74 V in that last row is an artefact of the measurement path, not the
+supply — see below.
+
 After the initial sync it settles back to the steady range.
 
 That is the whole system: ESP32-P4 with 32 MB PSRAM, the ESP32-C6 radio over
@@ -63,16 +66,24 @@ and the meter. USB VBUS is specified as 4.75 – 5.25 V, so at 0.28 A the rail i
 already a hair under the floor, and extrapolating the same slope gives about
 4.6 V at 0.35 A and 4.4 V at 0.5 A.
 
-**1.4 ohm is far too high to be the boost converter's regulation.** Almost all
-of it will be the path, not the part: the USB meter, a USB-C adapter, the cable
-and two connectors. Before concluding anything about the board, measure at the
-Nano's own input rather than at the meter, and prefer feeding the board's
-external 5 V header directly over going through a USB-C cable. The header
-exists for this and removes the connector chain entirely.
+**It was the wiring, not the board.** 1.4 ohm was always too high to be the
+boost converter's regulation. Feeding the 5 V rail directly at the header —
+P2 pin 1 for 5 V and pin 3 for GND — removes the USB meter, a USB-C adapter,
+the cable and two connectors from the path, and **the sag disappears**.
 
-Current headroom flatters this design; voltage margin is what to watch as load
-grows. The AccessPort's VBUS derives from this same rail, so whatever the rail
-sags to, the attached device sees less.
+So the load line above measures a test rig, not the supply. Record it anyway,
+because it is a useful reminder of how much a convenient measurement setup can
+invent: a rail that looked marginal against the USB minimum was actually fine,
+and the instrument was the problem.
+
+Two things follow. Take bench readings **at the board**, not at an inline meter
+several connectors upstream. And in a permanent install, feed the header
+directly rather than through a USB-C lead, for the same reason it fixed the
+measurement — every connector in the path costs voltage at exactly the moment
+current peaks.
+
+The AccessPort's VBUS derives from this same rail, so whatever the rail sags
+to, the attached device sees less. That is why this mattered enough to chase.
 
 ### Cold boot from battery works
 
@@ -107,6 +118,20 @@ cell take over without interrupting the P4 — the transition that actually
 matters for a car that has just been switched off, and the one the state model
 below depends on — has not been confirmed. Test it mid-sync, not idle: an
 interruption there is the case with something to lose.
+
+### Wiring the header
+
+The 5 V rail is exposed on both 2x13 headers. On **P2**, the one nearest RESET,
+pin 1 is 5 V and pin 3 is GND — adjacent in the same column, so it is a clean
+two-wire tap. Pin 2 beside it is `ESP_LDO_VO4`, which is not a ground.
+
+On **P1** the equivalents are pin 2 or pin 4 for 5 V and pin 6 for GND.
+
+Disconnect USB-C before feeding the header. The board supplies `VCC_5V` through
+a DIO7003 load switch fed from the USB-C port; injecting on the header bypasses
+that switch, so two sources would be contending with nothing arbitrating. It
+also means the board's own over-current protection is not in the path, so the
+supply side owns that responsibility.
 
 ### Reference parts
 
