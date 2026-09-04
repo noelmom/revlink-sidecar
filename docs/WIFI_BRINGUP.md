@@ -1,8 +1,15 @@
 # ESP32-C6 radio coexistence bring-up
 
-This document records the accepted onboard-radio profile for the Waveshare
-ESP32-P4-WIFI6-DEV-KIT. It is a hardware acceptance profile, not yet the
-shipping network manager.
+This document records the radio and storage coexistence work the shipping
+network manager was built on, and the live acceptance runs that cleared it.
+
+The runs below were performed on the Waveshare ESP32-P4-WIFI6-DEV-KIT. The
+published firmware targets the ESP32-P4-NANO; the GPIO assignments here are
+firmware constants and are the same on both boards, but header pin positions
+are not — see [`OLED_BRINGUP.md`](OLED_BRINGUP.md).
+
+For the current state of the network stack rather than how it was accepted,
+see [`ACCEPTANCE_LOG.md`](ACCEPTANCE_LOG.md).
 
 ## Resource ownership
 
@@ -170,17 +177,31 @@ switching an already-running card between native SD and SPI profiles, use a
 true board power cycle. Normal boots within one profile do not change the
 filesystem or format the card.
 
+## What has since shipped
+
+Most of what this document once listed as future work is in the published
+firmware: the onboarding HTTP service on port 80, bounded captive DNS and
+captive-probe routes, a unique mDNS hostname, a persistent station credential
+store, and the setup and forget flows. Provisioning sits behind a local
+boundary — a hardware-RNG hotspot password shown only on the OLED.
+
+The coordinator's station selection, reconnect, fallback, explicit retry,
+force-hotspot and transfer-lock behaviour are implemented as a state machine in
+`revlink_network`. [`ACCEPTANCE_LOG.md`](ACCEPTANCE_LOG.md) records what was
+accepted and when.
+
 ## Remaining work
 
-- Exercise longer-lived traffic before enabling a persistent client or
-  access point.
-- Live-accept the integrated coordinator's station selection, sticky
-  reconnect, wrong-password fallback, link-loss fallback, explicit retry,
-  force-hotspot, and transfer-lock failure matrix.
-- Add credential provisioning only behind an authenticated local control
-  boundary; never log SSIDs, BSSIDs, or passwords.
-- Implement and accept the onboarding HTTP service, captive DNS behavior,
-  mDNS, encrypted persistent credential store, and first-boot/reset flow.
-- Add BLE only as a separate authenticated adapter and acceptance gate. Its
-  intended scope is discovery, provisioning, connectivity recovery, and
-  compact status; all file transfer remains on Wi-Fi.
+- **The credential store is not encrypted.** A station credential is saved as a
+  versioned NVS record only after a successful association, and a failed
+  candidate never replaces the last working record — but that record is
+  plaintext. Encrypted NVS, flash encryption, and secure boot are required
+  before it counts as a shipping security boundary.
+- **BLE is not implemented.** Should it be added, it belongs behind a separate
+  authenticated adapter and its own acceptance gate, scoped to discovery,
+  provisioning, connectivity recovery, and compact status. All file transfer
+  stays on Wi-Fi.
+- The coordinator's failure matrix — wrong password, link loss, explicit retry,
+  force-hotspot, transfer-lock contention — is exercised in normal use but has
+  not been live-accepted exhaustively as a matrix.
+- Never log SSIDs, BSSIDs, or passwords. This holds for anything added later.
