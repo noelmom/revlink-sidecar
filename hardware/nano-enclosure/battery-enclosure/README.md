@@ -17,7 +17,7 @@ One shell, one lid, two side buttons. Holds the **ESP32-P4-NANO**, the
 
 | | This revision | First cut (PR #24 r1) | Original 55 mm case |
 | --- | --- | --- | --- |
-| Footprint | **97.95 × 59.54 mm** | 120.0 × 59.0 mm | 55 × 55 mm |
+| Footprint | **97.88 × 59.54 mm** | 120.0 × 59.0 mm | 55 × 55 mm |
 | Assembled height | **23.6 mm** | 23.6 mm | 36.6 mm |
 | Cell + charger | yes | yes | no room |
 | Charger position | on the lid, above the Nano | own floor bay | — |
@@ -342,12 +342,22 @@ physical board and are already in the builder.
 
 **SH1106 OLED module**
 
-8. Thickness from glass face to PCB back, without pins (expect ~3.6).
-   [`OLED_MODULE_THICKNESS_MM`]
-9. Lit-area centre offset from the PCB centre, X and Y, and which edge has
-   the pads. Typical modules are offset ~2.5 mm away from the pad edge.
-   [`OLED_ACTIVE_OFFSET_MM`, `OLED_WIRE_EXIT_WIDTH_MM`]
-10. Solder/wire height below the PCB back after wiring (must be ≤ 2.0).
+8. **done** — thickness **3.59** glass face to PCB back, confirming 3.6.
+   PCB **33.43 × 35.53**. [`OLED_MODULE_THICKNESS_MM`, `OLED_PCB_SIZE_MM`]
+9. **done** — the module is **not symmetric**. Margins from the PCB edge to
+   the lit area measured **10.98** and **6.95** across X, putting the lit
+   centre **2.015 mm** off the PCB centre; Y is off by 0.085, which is
+   nothing. The design previously assumed `(0.0, 0.0)`, so the window would
+   have sat 2 mm out.
+
+   Glass measures 19.20 × 31.22 around a 15.5 × 30.2 lit area, and the lit
+   area proved centred within the glass — 10.98 landed on the 1.85 mm glass
+   border predicted by that assumption.
+
+   Mounting holes **Ø3.00** at **27.98 × 30.11** centres, symmetric about the
+   PCB. [`OLED_ACTIVE_OFFSET_MM`, `OLED_HOLE_SPACING_MM`]
+10. **done** — solder below the PCB back measures **1.08**, inside the 2.0
+    limit, so the module seats.
 
 **ESP32-P4-NANO**
 
@@ -380,13 +390,13 @@ physical board and are already in the builder.
 ```
 01-revlink-sidecar-battery-shell.stl
   triangles 3090   vertices 1541   shells 1
-  bbox  97.95 x 59.54 x 21.60 mm
+  bbox  97.88 x 59.54 x 21.60 mm
   watertight True  (boundary edges 0, non-manifold 0)
   euler -4   genus 3   <- through-holes
 
 02-revlink-sidecar-battery-lid-oled.stl
   triangles 3398   vertices 1687   shells 1
-  bbox  97.95 x 59.54 x 8.04 mm
+  bbox  97.88 x 59.54 x 8.04 mm
   watertight True  (boundary edges 0, non-manifold 0)
   euler -12   genus 7   <- through-holes
 

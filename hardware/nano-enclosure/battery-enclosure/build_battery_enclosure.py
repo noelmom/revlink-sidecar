@@ -80,7 +80,7 @@ NANO_MIDBOARD_PART_HEIGHT_MM = 5.0                        # tallest part elsewhe
 # only 0.46 mm of the 1.0 mm swell allowance in Y, the clearance quietly
 # paying for tolerance instead of swell.
 BATTERY_SIZE_MM = (34.30, 54.54, 9.75)        # EEMB LP103454, X × Y × Z here
-OLED_PCB_SIZE_MM = (33.5, 35.4)               # X × Y as installed (portrait)
+OLED_PCB_SIZE_MM = (33.43, 35.53)             # MEASURED, X × Y as installed (portrait)
 OLED_ACTIVE_SIZE_MM = (15.5, 30.2)            # lit area, portrait
 
 # ===========================================================================
@@ -129,8 +129,24 @@ CHARGER_SCREW_HEAD_MM = (5.0, 2.0)            # M2.5 pan head (dk, k) under the 
 # ===========================================================================
 # PROVISIONAL — SH1106 module details the datasheet does not give
 # ===========================================================================
-OLED_MODULE_THICKNESS_MM = 3.6      # glass face to PCB back, without pins
-OLED_ACTIVE_OFFSET_MM = (0.0, 0.0)  # lit-area centre relative to PCB centre
+OLED_MODULE_THICKNESS_MM = 3.59     # MEASURED, glass face to PCB back, no pins
+# MEASURED. Margins from the PCB edge to the lit area came out 10.98 and 6.95
+# across X, so the lit centre sits 2.015 from the PCB centre - the module is
+# not symmetric, and the previous (0.0, 0.0) put the window 2 mm out. Y is off
+# by 0.085, which is nothing. Signs assume the module is installed with its
+# pad edge toward -Y and its narrow-margin side toward +X; rotating it 180
+# degrees flips both, and the firmware can flip the image to match.
+#
+# Installed pad edge toward -Y, narrow-margin side toward +X.
+OLED_ACTIVE_OFFSET_MM = (2.015, -0.085)  # lit-area centre relative to PCB centre
+# The window was cut at exactly the lit area, leaving nothing for the 0.6 mm
+# of pocket play. Relief is capped by the Y glass border, 0.51 per side, past
+# which the window would show bare PCB rather than glass.
+OLED_WINDOW_RELIEF_MM = 0.35        # per side, added around the lit area
+# MEASURED. Symmetric about the PCB centre, so they are a clean datum.
+OLED_HOLE_SPACING_MM = (27.98, 30.11)
+OLED_HOLE_DIAMETER_MM = 3.00
+OLED_POST_DIAMETER_MM = 2.80        # 0.2 clearance: +/-0.1 vs the pocket's +/-0.3
 OLED_WIRE_EXIT_WIDTH_MM = 10.0      # notch in both Y ends of the pocket frame
 
 # ===========================================================================
@@ -250,6 +266,15 @@ class Layout:
     oled_center: tuple[float, float]
     battery_ledge_x0: float
     button_guide_y1: float
+
+
+def oled_hole_positions(layout) -> tuple[tuple[float, float], ...]:
+    """The four OLED mounting holes in case coordinates."""
+    pcx = layout.oled_center[0] - OLED_ACTIVE_OFFSET_MM[0]
+    pcy = layout.oled_center[1] - OLED_ACTIVE_OFFSET_MM[1]
+    sx, sy = OLED_HOLE_SPACING_MM
+    return tuple((pcx + dx, pcy + dy)
+                 for dx in (-sx / 2, sx / 2) for dy in (-sy / 2, sy / 2))
 
 
 def charger_to_case(origin: tuple[float, float], cx: float, cy: float) -> tuple[float, float]:
@@ -377,7 +402,12 @@ def compute_layout() -> Layout:
         charger_output_pads=charger_output_pads,
         nano_holes=nano_holes,
         wall_screws=wall_screws,
-        oled_center=(battery.cx, battery.cy),
+        # The PCB is what has to fit the bay, so it keeps the bay centre and the
+        # window follows the lit area off to one side. Centring the window
+        # instead pushes the PCB 2 mm sideways, which fouls the rib in one
+        # rotation and the outer wall in the other - the bay has no room for it.
+        oled_center=(battery.cx + OLED_ACTIVE_OFFSET_MM[0],
+                     battery.cy + OLED_ACTIVE_OFFSET_MM[1]),
         battery_ledge_x0=battery.x0 + BATTERY_SIZE_MM[0] + BATTERY_CLEARANCE_MM,
         button_guide_y1=y_min + BUTTON_GUIDE_MM,
     )
@@ -624,7 +654,8 @@ def build_lid(L: Layout) -> trimesh.Trimesh:
         cutters.append(box(pcx - OLED_WIRE_EXIT_WIDTH_MM / 2, y0, frame_z0 - over,
                            pcx + OLED_WIRE_EXIT_WIDTH_MM / 2, y1, L.top_z))
     # Window over the lit area.
-    ww, wh = OLED_ACTIVE_SIZE_MM
+    ww = OLED_ACTIVE_SIZE_MM[0] + 2 * OLED_WINDOW_RELIEF_MM
+    wh = OLED_ACTIVE_SIZE_MM[1] + 2 * OLED_WINDOW_RELIEF_MM
     cutters.append(
         prism_z(rounded_rect(ox - ww / 2, oy - wh / 2, ox + ww / 2, oy + wh / 2, OLED_WINDOW_RADIUS_MM),
                 L.top_z - over, L.lid_top_z + over)
@@ -638,6 +669,15 @@ def build_lid(L: Layout) -> trimesh.Trimesh:
                                   POST_HOLE_DIAMETER_MM / 2))
 
     lid = difference(lid, cutters)
+
+    # Locating posts through the OLED's own mounting holes. Added after the
+    # pocket cutter, which would otherwise remove them. They stand clear of
+    # the glass: the holes sit outside its X extent.
+    lid = union([lid] + [
+        cylinder_z(x, y, L.top_z - OLED_MODULE_THICKNESS_MM, L.top_z,
+                   OLED_POST_DIAMETER_MM / 2)
+        for x, y in oled_hole_positions(L)
+    ])
     validate(lid, "lid")
     return lid
 

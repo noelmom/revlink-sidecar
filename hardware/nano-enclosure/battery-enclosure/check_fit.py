@@ -81,10 +81,20 @@ def main() -> int:
 
     charger = charger_envelope(L)
 
+    # The module is centred on its PCB, which is offset from the lit centre the
+    # window is cut around - modelling it at oled_center would place it 2 mm out.
     oled_z0 = L.top_z - B.OLED_MODULE_THICKNESS_MM
-    oled = B.box(L.oled_center[0] - B.OLED_PCB_SIZE_MM[0] / 2, L.oled_center[1] - B.OLED_PCB_SIZE_MM[1] / 2,
-                 oled_z0 - 2.0, L.oled_center[0] + B.OLED_PCB_SIZE_MM[0] / 2,
-                 L.oled_center[1] + B.OLED_PCB_SIZE_MM[1] / 2, L.top_z - EPS)
+    pcx = L.oled_center[0] - B.OLED_ACTIVE_OFFSET_MM[0]
+    pcy = L.oled_center[1] - B.OLED_ACTIVE_OFFSET_MM[1]
+    oled = B.box(pcx - B.OLED_PCB_SIZE_MM[0] / 2, pcy - B.OLED_PCB_SIZE_MM[1] / 2,
+                 oled_z0 - 2.0, pcx + B.OLED_PCB_SIZE_MM[0] / 2,
+                 pcy + B.OLED_PCB_SIZE_MM[1] / 2, L.top_z - EPS)
+    # Its four mounting holes, so the locating posts pass through rather than
+    # reading as interference.
+    oled = B.difference(oled, [
+        B.cylinder_z(hx, hy, oled_z0 - 2.0 - 1.0, L.top_z + 1.0, B.OLED_HOLE_DIAMETER_MM / 2)
+        for hx, hy in B.oled_hole_positions(L)
+    ])
 
     # 4 mm AF hex standoffs, modelled at their across-corners diameter.
     standoffs = [B.cylinder_z(x, y, B.NANO_PCB_THICKNESS_MM + EPS, L.top_z - EPS, 2.31) for x, y in L.nano_holes]
