@@ -41,6 +41,12 @@ The update transport is not implemented yet. Until it is, firmware is flashed
 locally through the development interface. Do not add a browser upload route
 that writes arbitrary bytes directly to an application partition.
 
+In the battery enclosure (`hardware/nano-enclosure/battery-enclosure/`) the
+Nano's USB-C is concealed, so **flashing happens before assembly**. Reflashing
+over USB means lifting the board out of the shell, or rebuilding the shell
+with its optional service opening — one more reason the browser update path
+matters for that build.
+
 **The order these are built in is load-bearing.** Rollback is already armed —
 `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in `sdkconfig.defaults` — while step
 5 has no implementation, so nothing in the tree calls

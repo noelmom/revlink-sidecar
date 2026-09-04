@@ -1,5 +1,12 @@
 # RevLink Sidecar ESP32-P4 Nano enclosure
 
+> [!IMPORTANT]
+> This is the original **55 × 55 × 36.6 mm** case for a Nano powered over
+> its own USB-C. It cannot hold a battery build. The battery enclosure —
+> Nano, SH1106 OLED, Adafruit 6106 charger and EEMB LP103454 cell in one
+> 120 × 59 × 23.6 mm shell — lives in [`../battery-enclosure/`](../battery-enclosure/)
+> and is a separate, from-scratch design (issue #23).
+
 > [!NOTE]
 > This geometry has been printed and assembled successfully. The revised lid
 > conceals the Ethernet jack, closes the donor case's switch slot and spare
@@ -41,6 +48,8 @@ also carries the attribution.
   of the lid; and
 - expose only the required USB-A connector, with the extra upper opening
   closed;
+- keep the donor bottom's microSD slot (Y− face, `x` 31 → 44.5, below
+  `z ≈ 0.3`) so the card can be removed with the case assembled;
 - conceal the installed Ethernet jack behind a **0.8 mm** exterior wall with
   internal connector clearance;
 - close the donor's large switch slot and provide guided side controls beside
