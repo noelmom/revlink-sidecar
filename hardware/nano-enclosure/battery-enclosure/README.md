@@ -367,8 +367,17 @@ passes. Run it after any constant changes.
 
 ## Rebuilding
 
-Python 3.11+, `numpy`, `trimesh`, `shapely`, `manifold3d`, `lxml`
-(`pip install "trimesh[easy]" manifold3d`); `matplotlib` for the previews.
+Python 3.11+ and the pinned dependencies in `requirements.txt`
+(`pip install -r requirements.txt`); `matplotlib` additionally for the
+previews.
+
+`trimesh` and `manifold3d` are pinned because they decide the mesh booleans
+`check_fit.py` is built on. An engine change could alter its verdict without
+any geometry changing, which is the one way this check could quietly stop
+meaning what it says.
+
+CI runs `check_fit.py` on every push, so an interference is a failed build
+rather than something noticed at the printer.
 
 ```sh
 python build_battery_enclosure.py      # writes print-package/*.stl and *.3mf
