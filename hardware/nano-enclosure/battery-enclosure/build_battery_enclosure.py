@@ -74,7 +74,12 @@ NANO_MIDBOARD_PART_HEIGHT_MM = 5.0                        # tallest part elsewhe
 # ===========================================================================
 # VERIFIED — cell and display
 # ===========================================================================
-BATTERY_SIZE_MM = (34.0, 54.0, 10.3)          # EEMB LP103454, X × Y × Z here
+# MEASURED on the cell in hand. Note X and Y exceed the LP103454's nominal
+# 34 x 54 by 0.30 and 0.54 while Z comes in 0.55 under 10.3 - so the datum
+# is the article, not the datasheet. Basing the bay on the nominal left
+# only 0.46 mm of the 1.0 mm swell allowance in Y, the clearance quietly
+# paying for tolerance instead of swell.
+BATTERY_SIZE_MM = (34.30, 54.54, 9.75)        # EEMB LP103454, X × Y × Z here
 OLED_PCB_SIZE_MM = (33.5, 35.4)               # X × Y as installed (portrait)
 OLED_ACTIVE_SIZE_MM = (15.5, 30.2)            # lit area, portrait
 

@@ -17,7 +17,7 @@ One shell, one lid, two side buttons. Holds the **ESP32-P4-NANO**, the
 
 | | This revision | First cut (PR #24 r1) | Original 55 mm case |
 | --- | --- | --- | --- |
-| Footprint | **97.95 × 59.0 mm** | 120.0 × 59.0 mm | 55 × 55 mm |
+| Footprint | **97.95 × 59.54 mm** | 120.0 × 59.0 mm | 55 × 55 mm |
 | Assembled height | **23.6 mm** | 23.6 mm | 36.6 mm |
 | Cell + charger | yes | yes | no room |
 | Charger position | on the lid, above the Nano | own floor bay | — |
@@ -359,7 +359,18 @@ physical board and are already in the builder.
 
 **Cell**
 
-13. Which short end the lead leaves and its length: ~70 mm reaches the JST
+13. **done** — cell. Measured **34.30 × 54.54 × 9.75**, against the LP103454's
+   nominal 34 × 54 × 10.3: over by 0.30 and 0.54 in plan, under by 0.55 in
+   thickness. The bay is now based on the article rather than the datasheet,
+   because sizing to nominal left just 0.46 mm of the 1.0 mm swell allowance
+   in Y — the clearance paying for tolerance instead of swell, which is the
+   one thing it exists for.
+
+   Costs 0.54 mm of case width. Returns 0.55 mm of height over the cell, so
+   the gap under the OLED goes 3.70 → 4.25 mm. Another cell of the same model
+   may sit elsewhere in tolerance; re-measure rather than assume.
+   [`BATTERY_SIZE_MM`]
+14. Which short end the lead leaves and its length: ~70 mm reaches the JST
     by the under-charger route described in [Layout](#layout).
 
 ## Verification
@@ -369,13 +380,13 @@ physical board and are already in the builder.
 ```
 01-revlink-sidecar-battery-shell.stl
   triangles 3090   vertices 1541   shells 1
-  bbox  97.95 x 59.00 x 21.60 mm
+  bbox  97.95 x 59.54 x 21.60 mm
   watertight True  (boundary edges 0, non-manifold 0)
   euler -4   genus 3   <- through-holes
 
 02-revlink-sidecar-battery-lid-oled.stl
   triangles 3398   vertices 1687   shells 1
-  bbox  97.95 x 59.00 x 8.04 mm
+  bbox  97.95 x 59.54 x 8.04 mm
   watertight True  (boundary edges 0, non-manifold 0)
   euler -12   genus 7   <- through-holes
 
