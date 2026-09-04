@@ -104,8 +104,12 @@ OLED_ACTIVE_SIZE_MM = (15.5, 30.2)            # lit area, portrait
 # ===========================================================================
 CHARGER_PCB_SIZE_MM = (29.21, 19.05)          # Eagle outline = 1.150 × 0.750 in
 CHARGER_PCB_THICKNESS_MM = 1.6
+# CONFIRMED against the board: centres measured 24.13 (long, exact) and 13.94
+# (short, 0.03 under the 13.97 these give), inset 2.54 on every edge. Kept at
+# the Eagle values rather than refitted to the 0.03 - that is caliper
+# technique, and the imperial grid is more trustworthy than one reading.
 CHARGER_HOLES_MM = ((2.54, 2.54), (26.67, 2.54), (2.54, 16.51), (26.67, 16.51))
-CHARGER_HOLE_DIAMETER_MM = 2.5
+CHARGER_HOLE_DIAMETER_MM = 2.52               # MEASURED; near-zero play on M2.5
 CHARGER_USB_C_CENTER_MM = 9.525               # along charger y, on the x = 0 edge
 CHARGER_USB_C_OVERHANG_MM = 1.14              # shell past the PCB edge; confirm
 CHARGER_USB_C_HEIGHT_MM = 3.16                # MEASURED 4.76 - 1.6: top-mount

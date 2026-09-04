@@ -281,9 +281,17 @@ physical board and are already in the builder.
    the 0.82 mm across the JST is the connector's mating face overhanging the
    edge — `CHARGER_JST_OVERHANG_MM`, kept clear of `P2` and the guide block.
    [`CHARGER_PCB_SIZE_MM`, `CHARGER_JST_OVERHANG_MM`]
-2. Mounting-hole centres from two adjacent edges and their diameter. Expect
-   2.54 / 26.67 along the long edge, 2.54 / 16.51 along the short, Ø2.5.
-   [`CHARGER_HOLES_MM`, `CHARGER_HOLE_DIAMETER_MM`]
+2. **done** — mounting holes. Centre-to-centre measured **24.13** on the long
+   axis (exact) and **13.94** on the short, against the 24.13 / 13.97 the
+   Eagle positions give; inset **2.54** from every edge; hole diameter
+   **2.52**. The Eagle values are kept rather than refitted to the 0.03 mm,
+   which is caliper technique — an imperial grid landing on 0.950 in and
+   0.550 in is better evidence than a single reading.
+
+   Note for assembly: 2.52 mm holes give an M2.5 screw almost no play, so the
+   board locates on the bosses rather than floating. That is only safe because
+   the positions are now confirmed. [`CHARGER_HOLES_MM`]
+
 3. **done** — USB-C is top-mount: 4.76 total at the receptacle = 1.6 PCB +
    3.16 shell. Still to confirm: its centre along the short edge (expect
    9.525) and the shell overhang past the PCB edge (expect ~1.1).
