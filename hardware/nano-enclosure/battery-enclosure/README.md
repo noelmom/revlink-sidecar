@@ -308,8 +308,25 @@ physical board and are already in the builder.
    exact variant. The layout refuses above **6.40** — swept against the
    guard — so the design sits with about 1 mm of unused slack.
    [`CHARGER_MAX_PART_HEIGHT_MM`]
-5. Confirm the 1×8 header stays **off**. Fitted pointing down, its tails
-   would take most of the 2.96 mm between the charger and the Nano.
+5. **done** — the 1×8 header is not fitted, so the 2.96 mm between the
+   charger and the Nano stays clear. Keep it off.
+
+   **Optional: a detachable 5 V link.** The charger is mounted to the lid, so
+   today the lid cannot be fully separated — its wires stay soldered to `P2`
+   and need about 40 mm of slack. A small connector in that pair would let the
+   lid come away cleanly, which is worth something both for service and for
+   the assembly video.
+
+   Height is not the constraint. `P2` sits at x 1.25–4.39 and the charger
+   starts at x 12.95, so a connector there is **beside** the charger, not
+   under it, with roughly 15 mm to the lid underside — about the USB-A's own
+   height, and more than any 2-pin connector needs.
+
+   What to watch is the 15 mm brass standoff at x 2.5, present at both
+   y 2.5 and y 47.5 — the same x as `P2`, at either end of its run. Whichever
+   is nearer the pin-1 end is what a connector has to clear. Pick a part,
+   measure its envelope, and it can be added to `check_fit.py` so CI proves
+   the clearance instead of the bench doing it.
 6. With a Ø4.6 boss on each hole, confirm ≥ 0.3 mm to the USB-C shell and
    the inductor at the two nearest holes (the layout suggests ~0.2 to the
    shell, ~0.45 to the inductor). If either touches, drop
