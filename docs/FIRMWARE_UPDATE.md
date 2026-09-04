@@ -41,6 +41,19 @@ The update transport is not implemented yet. Until it is, firmware is flashed
 locally through the development interface. Do not add a browser upload route
 that writes arbitrary bytes directly to an application partition.
 
+**The order these are built in is load-bearing.** Rollback is already armed —
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in `sdkconfig.defaults` — while step
+5 has no implementation, so nothing in the tree calls
+`esp_ota_mark_app_valid_cancel_rollback()`. That is harmless only because
+published images flash to `factory`, which is not subject to pending
+verification, and `ota_0`/`ota_1` are allocated but unused.
+
+Ship a transport before the health gate and every update boots once and
+reverts. The symptom is an update that appears to install and then silently
+does not take, with the cause sitting in the bootloader's state machine rather
+than in the transport that appears to be at fault. Build the gate first, or
+with it. Tracked in #21.
+
 ## Required health gate
 
 The platform-neutral decision layer is implemented in
