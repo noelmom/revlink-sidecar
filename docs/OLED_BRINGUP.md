@@ -1,7 +1,12 @@
 # RevLink SH1106 OLED bring-up
 
-This is the reviewed temporary harness for the existing 1.3-inch, seven-pin
-SPI SH1106 OLED and the Waveshare ESP32-P4-WIFI6-DEV-KIT.
+This is the reviewed harness for the existing 1.3-inch, seven-pin SPI SH1106
+OLED and the Waveshare **ESP32-P4-NANO**, which is the board the published
+firmware targets.
+
+Header pin numbers below are for that board. The ESP32-P4-WIFI6-DEV-KIT places
+the same GPIOs on different header positions, so do not carry these pin numbers
+across to it.
 
 ## Safety
 
@@ -14,26 +19,37 @@ SPI SH1106 OLED and the Waveshare ESP32-P4-WIFI6-DEV-KIT.
 
 ## Wiring
 
-| OLED label | ESP32-P4 header label | Function |
-| --- | --- | --- |
-| `GND` | `GND` | Common ground |
-| `VCC` | `3V3` | Display power |
-| `CLK` | `23` | SPI clock |
-| `MOSI` | `22` | SPI data |
-| `RES` | `2` | Display reset |
-| `DC` | `20` | Data/command select |
-| `CS` | `21` | Chip select |
+`P1` is the 2x13 header away from RESET, `P2` the one nearest it. Pin 1 is at
+the top of both, and odd pins are the column nearest the board edge.
+
+| OLED label | GPIO | Header pin | Function |
+| --- | --- | --- | --- |
+| `GND` | — | `P1` 9 | Common ground |
+| `VCC` | — | `P1` 17 | Display power, 3V3 |
+| `CLK` | `23` | `P1` 7 | SPI clock |
+| `MOSI` | `22` | `P1` 16 | SPI data |
+| `RES` | `2` | **`P2` 11** | Display reset |
+| `DC` | `20` | `P1` 13 | Data/command select |
+| `CS` | `21` | `P1` 15 | Chip select |
+
+**`RES` is the only wire on `P2`.** Six of the seven land on `P1`, so a display
+that stays dark after a reconnection is worth checking there first.
+
+Ground and 3V3 are the two rows with a choice. `P1` carries ground on pins 6, 9,
+14, 20 and 25, and 3V3 on pins 1 and 17; the table picks 9 and 17 to leave pins
+1, 3, 5 and 6 contiguous for the fuel gauge in #17, which needs 3V3, `SDA`,
+`SCL` and a ground of its own.
 
 ```text
 OLED SH1106                       ESP32-P4 header
 
- GND  o------------------------------o GND
- VCC  o------------------------------o 3V3
- CLK  o------------------------------o GPIO23
- MOSI o------------------------------o GPIO22
- RES  o------------------------------o GPIO2
- DC   o------------------------------o GPIO20
- CS   o------------------------------o GPIO21
+ GND  o------------------------------o GND      P1 pin 9
+ VCC  o------------------------------o 3V3      P1 pin 17
+ CLK  o------------------------------o GPIO23   P1 pin 7
+ MOSI o------------------------------o GPIO22   P1 pin 16
+ RES  o------------------------------o GPIO2    P2 pin 11
+ DC   o------------------------------o GPIO20   P1 pin 13
+ CS   o------------------------------o GPIO21   P1 pin 15
 ```
 
 The selected GPIOs avoid the accepted microSD bus (`39`–`44`), ESP32-C6 SDIO
