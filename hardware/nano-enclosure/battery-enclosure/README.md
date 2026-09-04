@@ -311,22 +311,27 @@ physical board and are already in the builder.
 5. **done** — the 1×8 header is not fitted, so the 2.96 mm between the
    charger and the Nano stays clear. Keep it off.
 
-   **Optional: a detachable 5 V link.** The charger is mounted to the lid, so
-   today the lid cannot be fully separated — its wires stay soldered to `P2`
-   and need about 40 mm of slack. A small connector in that pair would let the
-   lid come away cleanly, which is worth something both for service and for
-   the assembly video.
+   **A detachable 5 V link — inline, decided.** The charger is mounted to the
+   lid, so without a break in the 5 V pair the lid cannot be fully separated:
+   its wires stay soldered to `P2` and need about 40 mm of slack. The pair
+   therefore carries an inline connector a short way along the run. Both wires
+   stay soldered to `P2` as before.
 
-   Height is not the constraint. `P2` sits at x 1.25–4.39 and the charger
-   starts at x 12.95, so a connector there is **beside** the charger, not
-   under it, with roughly 15 mm to the lid underside — about the USB-A's own
-   height, and more than any 2-pin connector needs.
+   **Not board-mounted.** A connector plugged onto the header stands 19.11 mm
+   mated, measured, against 15.0 mm from the Nano's PCB top to the lid — over
+   by 4.11 mm, and over even against the case's tallest interior point, since
+   it starts 4.6 mm up on the board. Trimming unused ways does not help; the
+   housing height is the constraint, not the wire count.
 
-   What to watch is the 15 mm brass standoff at x 2.5, present at both
-   y 2.5 and y 47.5 — the same x as `P2`, at either end of its run. Whichever
-   is nearer the pin-1 end is what a connector has to clear. Pick a part,
-   measure its envelope, and it can be added to `check_fit.py` so CI proves
-   the clearance instead of the bench doing it.
+   Inline removes that stack-up: lying in the run, only the body's cross
+   section matters, against a free volume of roughly 11.7 × 15 mm in section
+   running about 31 mm alongside the charger. It also loads the wire rather
+   than the header pins when the lid is pulled, and the wire is the cheaper
+   part to replace.
+
+   Outstanding: the chosen connector's body dimensions lying flat, and where
+   along the run it sits, so it can be modelled in `check_fit.py`.
+
 6. With a Ø4.6 boss on each hole, confirm ≥ 0.3 mm to the USB-C shell and
    the inductor at the two nearest holes (the layout suggests ~0.2 to the
    shell, ~0.45 to the inductor). If either touches, drop
