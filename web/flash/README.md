@@ -112,10 +112,39 @@ idf.py -C firmware/esp32p4 -B "$B" \
 # 6. Run ./scripts/ci-local.sh — the manifest, version and digest assertions
 #    must pass.
 # 7. Flash a real board before announcing it.
-# 8. Open a PR and MERGE IT WITH A MERGE COMMIT, not a squash. See below.
-# 9. Tag the build commit, then cut a GitHub Release pointing at the release
-#    directory on main.
+# 8. Re-check the docs against what you just flashed. See below.
+# 9. Open a PR and MERGE IT WITH A MERGE COMMIT, not a squash. See below.
+# 10. Tag the build commit, then cut a GitHub Release pointing at the release
+#     directory on main.
 ```
+
+### Re-check the docs against what you just built
+
+Every sentence in the docs saying the firmware cannot do something is a claim
+with an expiry date. Three have been wrong in public: the landing page said
+writing maps was unproven on hardware while it was in daily use, `SAFETY.md`
+said consent re-locks every boot when it persists in NVS, and
+`WIFI_BRINGUP.md` listed a shipped network stack as future work.
+
+This finds the sentences worth re-reading. It returns a short list, not a wall:
+
+```bash
+grep -rniE "not yet|has not been|have not been|is not implemented|\
+remains unimplemented|not proven|future work|remaining work|\
+not in the published|does not yet" \
+  --include="*.md" --include="*.html" docs/ web/site/ *.md
+```
+
+Confirm each hit is still true of the build in the release directory, and fix
+what is not in the same PR.
+
+Check them against the tree or the binary, **never against another doc**. The
+landing page's false claim was inherited from `SAFETY.md`, so a single stale
+sentence propagated outward into the most public surface the project has.
+
+Both directions matter, but they are not equally bad. Understating what
+shipped is embarrassing. Overstating a safety property — or failing to notice
+one has regressed — is not, and that is the direction this check exists for.
 
 ### Merge the release PR, do not squash it
 
