@@ -116,6 +116,12 @@ tried and retired — the full write-up is in
 > [`hardware/nano-enclosure/tools/`](hardware/nano-enclosure/tools/) for a
 > dependency-free way to verify a revision actually changed what you think it
 > changed.
+>
+> **Battery build.** A separate, lower enclosure for the Nano plus the
+> Adafruit 6106 charger and an LP103454 cell — 98 × 59 × 23.6 mm — is in
+> [`hardware/nano-enclosure/battery-enclosure/`](hardware/nano-enclosure/battery-enclosure/).
+> It conceals the Nano's USB-C, so **flash before assembly**. Its geometry is
+> not print-ready until the charger board has been measured (#23).
 
 ## Install
 

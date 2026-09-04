@@ -61,4 +61,14 @@ jobs:
             enclosure-print/source/esp32-p4-nano-top-solid.stl \
             enclosure-print/print-package/01-revlink-sidecar-nano-bottom.stl \
             enclosure-print/print-package/02-revlink-sidecar-nano-top-oled-usbc-controls.stl \
-            enclosure-print/print-package/03-revlink-sidecar-nano-usbc-side-buttons-pair.stl
+            enclosure-print/print-package/03-revlink-sidecar-nano-usbc-side-buttons-pair.stl \
+            battery-enclosure/print-package/01-revlink-sidecar-battery-shell.stl \
+            battery-enclosure/print-package/02-revlink-sidecar-battery-lid-oled.stl \
+            battery-enclosure/print-package/03-revlink-sidecar-battery-side-buttons-pair.stl
+
+      - name: Install geometry dependencies
+        run: pip install -r hardware/nano-enclosure/battery-enclosure/requirements.txt
+
+      - name: Check battery enclosure fit
+        working-directory: hardware/nano-enclosure/battery-enclosure
+        run: python3 check_fit.py

@@ -1,0 +1,5 @@
+# Pinned so a boolean-engine change cannot silently alter check_fit.py's
+# verdict. trimesh and manifold3d decide the mesh booleans the interference
+# check is built on; the rest resolve as their dependencies.
+trimesh[easy]==4.12.2
+manifold3d==3.5.2

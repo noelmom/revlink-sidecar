@@ -181,7 +181,8 @@ fi
 phase "Enclosure geometry baseline"
 if have python3; then
   python3 hardware/nano-enclosure/tools/stl_inspect.py \
-    hardware/nano-enclosure/enclosure-print/print-package/*.stl
+    hardware/nano-enclosure/enclosure-print/print-package/*.stl \
+    hardware/nano-enclosure/battery-enclosure/print-package/*.stl
 else
   echo "  python3 not found; skipping geometry report." >&2
 fi

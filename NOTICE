@@ -43,6 +43,21 @@ Ethernet, switch and spare USB-A openings. CC BY permits a derivative to add
 ShareAlike, so this is compatible; it does not and cannot relicense the donor
 geometry.
 
+The battery enclosure under hardware/nano-enclosure/battery-enclosure/ is
+NOT a derivative of the donor. It is authored from scratch by a parametric
+builder that loads no donor file. The ESP32-P4-NANO dimensions it uses were
+measured from the donor's board model and are facts about the Waveshare
+board, not copied geometry. That directory is CC BY-SA 4.0 in its entirety,
+with no upstream attribution required; the attribution above continues to
+apply only to the original 55 mm enclosure in enclosure-print/.
+
+The Adafruit 6106 outline, mounting-hole and connector positions in the
+battery builder were read from Adafruit's published board layout
+(https://github.com/adafruit/Adafruit-bq25185-with-5V-Boost-PCB, CC BY-SA,
+designed by Limor Fried/Ladyada for Adafruit Industries), as were the
+connector package names used to identify the parts. Only those dimensions
+and facts are used; no Adafruit file is redistributed here.
+
 
 --------------------------------------------------------------------------
 Trademarks
