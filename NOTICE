@@ -51,11 +51,12 @@ board, not copied geometry. That directory is CC BY-SA 4.0 in its entirety,
 with no upstream attribution required; the attribution above continues to
 apply only to the original 55 mm enclosure in enclosure-print/.
 
-The Adafruit 6106 outline and mounting-hole positions in the battery
-builder were read from Adafruit's published board layout
+The Adafruit 6106 outline, mounting-hole and connector positions in the
+battery builder were read from Adafruit's published board layout
 (https://github.com/adafruit/Adafruit-bq25185-with-5V-Boost-PCB, CC BY-SA,
-designed by Limor Fried/Ladyada for Adafruit Industries). Only those
-dimensions are used; no Adafruit file is redistributed here.
+designed by Limor Fried/Ladyada for Adafruit Industries), as were the
+connector package names used to identify the parts. Only those dimensions
+and facts are used; no Adafruit file is redistributed here.
 
 
 --------------------------------------------------------------------------
