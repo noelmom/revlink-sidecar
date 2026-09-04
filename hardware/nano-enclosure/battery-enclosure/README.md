@@ -288,13 +288,17 @@ physical board and are already in the builder.
    3.16 shell. Still to confirm: its centre along the short edge (expect
    9.525) and the shell overhang past the PCB edge (expect ~1.1).
    [`CHARGER_USB_C_CENTER_MM`, `CHARGER_USB_C_OVERHANG_MM`]
-4. **The tallest part after the terminal block is removed**, measured from
-   the PCB top. The builder carries 5.44 (7.04 total with the block − 1.6)
-   as an upper bound; the inductor footprint says 4.5. Measure the JST PH
-   (S2B-PH-SM4-TB) explicitly — distributor listings quote heights for it
-   that would not fit inside the 7.04 reading, so the reading and the part
-   need reconciling. Anything over ~6.15 makes the builder refuse; lower
-   values raise the charger and widen every gap under it.
+4. **done** — tallest part. The 7.04 reading was taken across the JST, so it
+   measures the JST rather than the terminal block. The JST is SMT with no
+   underside tails, putting it 7.04 − 1.6 = **5.44** above the PCB top, above
+   the 4.5 inductor. It is therefore the governing part and remains so once
+   the terminal block is removed, which is why that removal does not change
+   the constant.
+
+   Distributor listings for an S2B-PH-SM4-TB quote heights that will not fit
+   inside 7.04; the board in hand wins, and the fitted part may not be that
+   exact variant. The layout refuses above **6.40** — swept against the
+   guard — so the design sits with about 1 mm of unused slack.
    [`CHARGER_MAX_PART_HEIGHT_MM`]
 5. Confirm the 1×8 header stays **off**. Fitted pointing down, its tails
    would take most of the 2.96 mm between the charger and the Nano.

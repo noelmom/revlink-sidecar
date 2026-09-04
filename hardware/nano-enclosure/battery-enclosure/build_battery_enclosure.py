@@ -89,12 +89,18 @@ OLED_ACTIVE_SIZE_MM = (15.5, 30.2)            # lit area, portrait
 # the JST / 18.86 across bare PCB, 4.76 total at the USB-C, 7.04 total over
 # the tallest connector *with the terminal block still fitted*.
 #
-# PROVISIONAL: the terminal block is being removed (two wires are soldered
-# in its place to the Nano's P2 pins 1 and 3), so the tallest remaining part
-# is not yet known. CHARGER_MAX_PART_HEIGHT_MM carries the measured upper
-# bound (7.04 - 1.6) until the board is measured again without the block;
-# the inductor footprint suggests 4.5. Everything derived from it (charger
-# height, lid boss height, USB-C cutout) recomputes on rebuild.
+# CONFIRMED: the 7.04 reading was taken across the JST, not the terminal
+# block, so it measures the JST directly. The JST is SMT with no underside
+# tails, making it 7.04 - 1.6 = 5.44 above the PCB top. That also exceeds the
+# 4.5 inductor, so the JST is the governing part and stays so once the
+# terminal block is removed (two wires are soldered in its place to the
+# Nano's P2 pins 1 and 3).
+#
+# Distributor listings for an S2B-PH-SM4-TB quote heights that will not fit
+# inside 7.04. The physical board wins; the part may not be that exact
+# variant. Everything derived from this constant (charger height, lid boss
+# height, USB-C cutout) recomputes on rebuild, and the layout refuses above
+# 6.40 - swept against the guard, so there is ~1 mm of unused slack.
 # ===========================================================================
 CHARGER_PCB_SIZE_MM = (29.21, 19.05)          # Eagle outline = 1.150 × 0.750 in
 CHARGER_PCB_THICKNESS_MM = 1.6
@@ -107,7 +113,7 @@ CHARGER_USB_C_WIDTH_MM = 8.94
 CHARGER_JST_CENTER_MM = 13.97                 # along charger x, on the y = 19.05 edge
 CHARGER_JST_WIDTH_MM = 8.0                    # footprint outline along charger x
 CHARGER_JST_OVERHANG_MM = 0.82                # MEASURED 19.87 - 19.05, mating face past the edge
-CHARGER_MAX_PART_HEIGHT_MM = 5.44             # PROVISIONAL upper bound, see above
+CHARGER_MAX_PART_HEIGHT_MM = 5.44             # MEASURED, the JST: 7.04 - 1.6
 CHARGER_UNDERSIDE_DEPTH_MM = 1.0              # USB-C shell legs and the two wire tails, trimmed
 CHARGER_SCREW_HEAD_MM = (5.0, 2.0)            # M2.5 pan head (dk, k) under the PCB
 
